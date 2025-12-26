@@ -72,7 +72,13 @@ export async function GET(request: NextRequest) {
         }
 
         // Retornar respuesta al cliente
-        return NextResponse.json(data);
+        return NextResponse.json(data, {
+            headers: {
+                'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+                'X-Cache': 'MISS',
+                'X-Response-Time': `${duration}ms`
+            }
+        });
 
     } catch (error) {
         console.error('[API Proxy] Error:', error);
