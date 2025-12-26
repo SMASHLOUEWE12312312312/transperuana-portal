@@ -35,7 +35,8 @@ export function Sidebar() {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
 
-    // For demo purposes, assume user is admin
+    // TEMPORAL: Mostrar Configuración a todos los usuarios
+    // TODO: Implementar verificación de rol con next-auth
     const isAdmin = true;
 
     const visibleItems = navItems.filter(item => !item.adminOnly || isAdmin);
