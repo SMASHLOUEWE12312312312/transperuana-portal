@@ -1,61 +1,65 @@
 /**
- * API Service para conectar con Google Apps Script Web App
+ * API Service para el Portal de Monitoreo ETL
+ * Conecta con Google Apps Script a través del proxy local
  * 
- * INSTRUCCIONES:
- * 1. Copia el archivo 18_WebAppAPI.js a tu proyecto de Apps Script
- * 2. Implementa como Web App (Implementar > Nueva implementación > Aplicación web)
- * 3. Configura: Ejecutar como "Yo", Acceso "Cualquier persona"
- * 4. Copia la URL generada y actualiza APPS_SCRIPT_URL abajo
+ * Versión: 2.0 - Con API Route Proxy (sin problemas CORS)
  */
 
-// URL de la Web App de Apps Script
-// IMPORTANTE: Reemplazar con tu URL real después de implementar
-const APPS_SCRIPT_URL = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL || '';
+// URL del proxy local - siempre disponible en el mismo dominio
+const API_PROXY_URL = '/api/apps-script';
 
-// Flag para usar mock data mientras no hay URL configurada
-const USE_MOCK_DATA = !APPS_SCRIPT_URL;
+// Flag para usar mock data (solo si explícitamente deshabilitado)
+const FORCE_MOCK_DATA = process.env.NEXT_PUBLIC_FORCE_MOCK === 'true';
 
 /**
  * Función genérica para llamar a la API
- * IMPORTANTE: No usar headers personalizados para evitar CORS preflight
+ * Usa el proxy local para evitar CORS
  */
 async function callAPI<T>(action: string, params: Record<string, string> = {}): Promise<T> {
-    if (USE_MOCK_DATA) {
-        console.warn(`[API] Sin URL configurada, usando mock data para: ${action}`);
+    if (FORCE_MOCK_DATA) {
+        console.warn(`[API] Mock data forzado para: ${action}`);
         throw new Error('MOCK_MODE');
     }
 
-    const url = new URL(APPS_SCRIPT_URL);
+    // Construir URL con parámetros
+    const url = new URL(API_PROXY_URL, window.location.origin);
     url.searchParams.append('action', action);
 
     Object.entries(params).forEach(([key, value]) => {
-        if (value) url.searchParams.append(key, value);
+        if (value !== undefined && value !== null && value !== '') {
+            url.searchParams.append(key, value);
+        }
     });
 
     try {
         console.log(`[API] Llamando: ${action}`);
+        const startTime = performance.now();
 
-        // IMPORTANTE: No usar headers personalizados con Apps Script
-        // Solo peticiones GET simples funcionan sin CORS preflight
         const response = await fetch(url.toString(), {
             method: 'GET',
-            redirect: 'follow', // Apps Script hace redirect, debemos seguirlo
+            headers: {
+                'Accept': 'application/json',
+            },
         });
 
+        const duration = Math.round(performance.now() - startTime);
+
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `HTTP error: ${response.status}`);
         }
 
         const data = await response.json();
 
         if (!data.success) {
-            throw new Error(data.error || 'Error en la API');
+            throw new Error(data.error || 'Error en la respuesta de la API');
         }
 
-        console.log(`[API] ${action} exitoso`);
+        console.log(`[API] ${action} exitoso (${duration}ms)`);
         return data as T;
+
     } catch (error) {
-        console.error(`[API] Error llamando a ${action}:`, error);
+        console.error(`[API] Error en ${action}:`, error);
         throw error;
     }
 }
@@ -298,16 +302,16 @@ export async function fetchCompanias(): Promise<{ companias: string[] }> {
  */
 export async function pingAPI(): Promise<boolean> {
     try {
-        await callAPI<{ success: boolean }>('ping');
-        return true;
+        const result = await callAPI<{ success: boolean; message: string }>('ping');
+        return result.success;
     } catch {
         return false;
     }
 }
 
 /**
- * Indica si estamos en modo mock
+ * Indica si estamos usando mock data forzado
  */
 export function isUsingMockData(): boolean {
-    return USE_MOCK_DATA;
+    return FORCE_MOCK_DATA;
 }
