@@ -3,7 +3,8 @@ import { getServerBitacora } from '@/lib/server-api';
 import { BitacoraClient } from '@/components/bitacora/BitacoraClient';
 import { BitacoraSkeleton } from '@/components/bitacora/BitacoraSkeleton';
 
-export const revalidate = 30;
+export const dynamic = 'force-static';
+export const revalidate = 60;
 
 export default async function BitacoraPage() {
     const initialData = await getServerBitacora(100);

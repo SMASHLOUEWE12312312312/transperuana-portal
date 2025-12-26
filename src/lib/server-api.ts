@@ -1,22 +1,14 @@
 /**
  * Server-side API functions
- * Solo para uso en Server Components y API Routes
- * NO hay problemas CORS porque las llamadas se hacen server-to-server
+ * Optimizado para ISR (Incremental Static Regeneration)
  */
 
 const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL || '';
 
-interface CacheEntry {
-    data: unknown;
-    timestamp: number;
-}
-
-// Cache en memoria del servidor (persiste entre requests en el mismo proceso)
-const serverCache = new Map<string, CacheEntry>();
-const SERVER_CACHE_TTL = 30000; // 30 segundos
-
 /**
- * Fetch con cache server-side
+ * Fetch optimizado para ISR
+ * - Sin cache en memoria (Next.js maneja el cache)
+ * - Con timeout para evitar builds lentos
  */
 async function serverFetch<T>(action: string, params: Record<string, string> = {}): Promise<T | null> {
     if (!APPS_SCRIPT_URL) {
@@ -24,32 +16,32 @@ async function serverFetch<T>(action: string, params: Record<string, string> = {
         return null;
     }
 
-    // Construir URL
     const url = new URL(APPS_SCRIPT_URL);
     url.searchParams.append('action', action);
     Object.entries(params).forEach(([key, value]) => {
         if (value) url.searchParams.append(key, value);
     });
 
-    const cacheKey = url.toString();
-
-    // Verificar cache
-    const cached = serverCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < SERVER_CACHE_TTL) {
-        console.log(`[Server API] Cache HIT: ${action}`);
-        return cached.data as T;
-    }
-
     try {
         console.log(`[Server API] Fetching: ${action}`);
         const startTime = Date.now();
 
+        // AbortController para timeout de 10 segundos
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
         const response = await fetch(url.toString(), {
             method: 'GET',
             redirect: 'follow',
-            // Next.js fetch cache
-            next: { revalidate: 30 }
+            signal: controller.signal,
+            // Cache de Next.js para ISR
+            next: {
+                revalidate: 60,
+                tags: [action]
+            }
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             throw new Error(`Status: ${response.status}`);
@@ -60,21 +52,18 @@ async function serverFetch<T>(action: string, params: Record<string, string> = {
 
         console.log(`[Server API] ${action} completado en ${duration}ms`);
 
-        if (data.success) {
-            serverCache.set(cacheKey, { data, timestamp: Date.now() });
-        }
-
         return data as T;
     } catch (error) {
-        console.error(`[Server API] Error en ${action}:`, error);
+        if (error instanceof Error && error.name === 'AbortError') {
+            console.error(`[Server API] Timeout en ${action}`);
+        } else {
+            console.error(`[Server API] Error en ${action}:`, error);
+        }
         return null;
     }
 }
 
-// ========================================================
-// TIPOS
-// ========================================================
-
+// Type definitions
 export interface ServerDashboardResponse {
     success: boolean;
     kpis: {
@@ -183,10 +172,7 @@ export interface ServerConfigResponse {
     }>;
 }
 
-// ========================================================
-// FUNCIONES EXPORTADAS
-// ========================================================
-
+// API functions
 export async function getServerDashboard(): Promise<ServerDashboardResponse | null> {
     return serverFetch<ServerDashboardResponse>('dashboard');
 }

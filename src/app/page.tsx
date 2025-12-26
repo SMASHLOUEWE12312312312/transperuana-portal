@@ -3,11 +3,11 @@ import { getServerDashboard } from '@/lib/server-api';
 import { DashboardClient } from '@/components/dashboard/DashboardClient';
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton';
 
-// Revalidar datos cada 30 segundos
-export const revalidate = 30;
+// ISR: Generar estáticamente, revalidar cada 60 segundos en background
+export const dynamic = 'force-static';
+export const revalidate = 60;
 
 export default async function DashboardPage() {
-  // Fetch en el servidor - sin CORS, mucho más rápido
   const initialData = await getServerDashboard();
 
   return (
