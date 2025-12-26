@@ -26,15 +26,16 @@ async function serverFetch<T>(action: string, params: Record<string, string> = {
         console.log(`[Server API] Fetching: ${action}`);
         const startTime = Date.now();
 
-        // AbortController para timeout de 10 segundos
+        // AbortController para timeout de 15 segundos
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
 
         const response = await fetch(url.toString(), {
             method: 'GET',
             redirect: 'follow',
             signal: controller.signal,
-            // Cache de Next.js para ISR
+            // Cache de Next.js para ISR - IMPORTANTE
+            cache: 'force-cache',
             next: {
                 revalidate: 60,
                 tags: [action]
