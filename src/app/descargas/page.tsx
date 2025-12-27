@@ -3,8 +3,7 @@ import { getServerDescargas } from '@/lib/server-api';
 import { DescargasClient } from '@/components/descargas/DescargasClient';
 import { DescargasSkeleton } from '@/components/descargas/DescargasSkeleton';
 
-export const dynamic = 'force-static';
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function DescargasPage() {
     const initialData = await getServerDescargas();

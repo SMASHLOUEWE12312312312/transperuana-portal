@@ -3,8 +3,7 @@ import { getServerProcesos } from '@/lib/server-api';
 import { ProcesosClient } from '@/components/procesos/ProcesosClient';
 import { ProcesosSkeleton } from '@/components/procesos/ProcesosSkeleton';
 
-export const dynamic = 'force-static';
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function ProcesosPage() {
     const initialData = await getServerProcesos(200);

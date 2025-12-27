@@ -3,8 +3,7 @@ import { getServerErrores } from '@/lib/server-api';
 import { ErroresClient } from '@/components/errores/ErroresClient';
 import { ErroresSkeleton } from '@/components/errores/ErroresSkeleton';
 
-export const dynamic = 'force-static';
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function ErroresPage() {
     const initialData = await getServerErrores(500);
