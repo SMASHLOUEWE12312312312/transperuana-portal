@@ -3,6 +3,7 @@ import { Inter, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { Providers } from "./providers";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -36,11 +37,13 @@ export default function RootLayout({
         className={`${inter.variable} ${plusJakarta.variable} ${jetbrainsMono.variable} antialiased`}
         style={{ fontFamily: 'var(--font-inter), sans-serif' }}
       >
-        <Header />
-        <Sidebar />
-        <main className="ml-64 mt-16 min-h-[calc(100vh-4rem)] p-6 transition-all duration-300">
-          {children}
-        </main>
+        <Providers>
+          <Header />
+          <Sidebar />
+          <main className="ml-64 mt-16 min-h-[calc(100vh-4rem)] p-6 transition-all duration-300">
+            {children}
+          </main>
+        </Providers>
       </body>
     </html>
   );

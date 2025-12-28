@@ -1,17 +1,34 @@
 /**
  * API Route Proxy para Google Apps Script
  * Elimina problemas CORS al actuar como intermediario server-side
+ * PROTEGIDO: Requiere sesión autenticada
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/auth';
 
 // URL del Apps Script (variable de entorno del servidor, NO pública)
 const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL || '';
+const APPS_SCRIPT_TOKEN = process.env.APPS_SCRIPT_TOKEN || '';
 
 // Cache simple en memoria para reducir llamadas
 const cache = new Map<string, { data: unknown; timestamp: number }>();
 const CACHE_TTL = 30000; // 30 segundos
 
 export async function GET(request: NextRequest) {
+    // ========== PROTECCIÓN: Verificar sesión ==========
+    const session = await auth();
+
+    if (!session || !session.user?.email) {
+        return NextResponse.json(
+            { success: false, error: 'No autorizado. Inicie sesión.' },
+            { status: 401 }
+        );
+    }
+
+    const userEmail = session.user.email.toLowerCase();
+    const userRole = (session.user as { role?: string }).role || 'EJECUTIVO';
+    // =================================================
+
     // Verificar que la URL esté configurada
     if (!APPS_SCRIPT_URL) {
         console.error('[API Proxy] APPS_SCRIPT_URL no configurada');
@@ -32,20 +49,38 @@ export async function GET(request: NextRequest) {
             url.searchParams.append(key, value);
         });
 
-        // Generar clave de cache
-        const cacheKey = url.toString();
+        // ========== AGREGAR TOKEN Y EMAIL ==========
+        if (APPS_SCRIPT_TOKEN) {
+            url.searchParams.append('_token', APPS_SCRIPT_TOKEN);
+        }
+
+        // Para filtro por ejecutivo: pasar email (admin ve todo)
+        if (userRole === 'ADMIN') {
+            // Admin puede pasar ownerEmail=ALL o específico si hay filtro
+            const ownerFilter = searchParams.get('ownerEmail');
+            if (!ownerFilter) {
+                url.searchParams.append('ownerEmail', 'ALL');
+            }
+        } else {
+            // Ejecutivo solo ve sus datos - forzar su email
+            url.searchParams.set('ownerEmail', userEmail);
+        }
+        // ==========================================
+
+        // Generar clave de cache (incluye email para separar caches por usuario)
+        const cacheKey = url.toString() + '_user_' + userEmail;
 
         // Verificar cache (excepto para acciones que necesitan datos frescos)
         const freshActions = ['ping', 'reprocesar'];
         if (!freshActions.includes(action)) {
             const cached = cache.get(cacheKey);
             if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-                console.log(`[API Proxy] Cache HIT para: ${action}`);
+                console.log(`[API Proxy] Cache HIT para: ${action} (${userEmail})`);
                 return NextResponse.json(cached.data);
             }
         }
 
-        console.log(`[API Proxy] Llamando Apps Script: ${action}`);
+        console.log(`[API Proxy] ${userEmail} llamando: ${action}`);
         const startTime = Date.now();
 
         // Hacer la llamada al Apps Script desde el servidor
@@ -74,7 +109,7 @@ export async function GET(request: NextRequest) {
         // Retornar respuesta al cliente
         return NextResponse.json(data, {
             headers: {
-                'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+                'Cache-Control': 'private, s-maxage=30, stale-while-revalidate=60',
                 'X-Cache': 'MISS',
                 'X-Response-Time': `${duration}ms`
             }
@@ -98,6 +133,17 @@ export async function GET(request: NextRequest) {
 
 // Manejar POST para futuras acciones (reprocesar, etc.)
 export async function POST(request: NextRequest) {
+    // ========== PROTECCIÓN: Verificar sesión ==========
+    const session = await auth();
+
+    if (!session || !session.user?.email) {
+        return NextResponse.json(
+            { success: false, error: 'No autorizado' },
+            { status: 401 }
+        );
+    }
+    // =================================================
+
     if (!APPS_SCRIPT_URL) {
         return NextResponse.json(
             { success: false, error: 'API no configurada' },
@@ -107,6 +153,11 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = await request.json();
+
+        // Agregar token al body
+        if (APPS_SCRIPT_TOKEN) {
+            body._token = APPS_SCRIPT_TOKEN;
+        }
 
         const response = await fetch(APPS_SCRIPT_URL, {
             method: 'POST',

@@ -2,6 +2,7 @@
 
 import { Bell, User, LogOut, ChevronDown } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 
 interface Notification {
     id: string;
@@ -11,21 +12,29 @@ interface Notification {
 }
 
 export function Header() {
+    const { data: session, status } = useSession();
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
 
-    // Usuario temporal hasta implementar autenticación real
-    // TODO: Reemplazar con next-auth cuando se implemente
-    const user = {
-        name: 'Usuario',
-        email: 'usuario@transperuana.com.pe',
-        role: 'Usuario'
-    };
+    // Usuario desde la sesión
+    const user = session?.user ? {
+        name: session.user.name || 'Usuario',
+        email: session.user.email || '',
+        role: (session.user as { role?: string }).role || 'EJECUTIVO',
+        image: session.user.image
+    } : null;
 
     // Cargar notificaciones desde la API
     const loadNotifications = useCallback(async () => {
+        // Solo cargar si hay sesión
+        if (status !== 'authenticated') {
+            setNotifications([]);
+            setIsLoadingNotifications(false);
+            return;
+        }
+
         try {
             setIsLoadingNotifications(true);
             const response = await fetch('/api/apps-script?action=alertas');
@@ -50,7 +59,7 @@ export function Header() {
         } finally {
             setIsLoadingNotifications(false);
         }
-    }, []);
+    }, [status]);
 
     useEffect(() => {
         loadNotifications();
@@ -67,6 +76,20 @@ export function Header() {
         document.addEventListener('click', handleClickOutside);
         return () => document.removeEventListener('click', handleClickOutside);
     }, []);
+
+    // Si está cargando la sesión, mostrar header básico
+    if (status === 'loading') {
+        return (
+            <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-50">
+                <div className="flex items-center justify-between h-full px-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
+                        <div className="h-5 w-32 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                </div>
+            </header>
+        );
+    }
 
     return (
         <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-50">
@@ -149,12 +172,22 @@ export function Header() {
                             }}
                             className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
                         >
-                            <div className="w-8 h-8 rounded-full bg-[#CD3529] text-white flex items-center justify-center">
-                                <span className="text-sm font-medium">U</span>
-                            </div>
+                            {/* Avatar - usar imagen de Google si existe */}
+                            {user?.image ? (
+                                <img
+                                    src={user.image}
+                                    alt={user.name}
+                                    className="w-8 h-8 rounded-full object-cover"
+                                    referrerPolicy="no-referrer"
+                                />
+                            ) : (
+                                <div className="w-8 h-8 rounded-full bg-[#CD3529] text-white flex items-center justify-center">
+                                    <span className="text-sm font-medium">{user?.name?.[0] || 'U'}</span>
+                                </div>
+                            )}
                             <div className="hidden md:block text-left">
-                                <p className="text-sm font-medium text-gray-700">{user.name}</p>
-                                <p className="text-xs text-gray-500">{user.role}</p>
+                                <p className="text-sm font-medium text-gray-700">{user?.name || 'Usuario'}</p>
+                                <p className="text-xs text-gray-500">{user?.role || 'Usuario'}</p>
                             </div>
                             <ChevronDown size={16} className="text-gray-400 hidden md:block" />
                         </button>
@@ -162,8 +195,8 @@ export function Header() {
                         {showUserMenu && (
                             <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 animate-slideIn">
                                 <div className="p-3 border-b border-gray-200">
-                                    <p className="font-medium text-gray-900">{user.name}</p>
-                                    <p className="text-sm text-gray-500">{user.email}</p>
+                                    <p className="font-medium text-gray-900">{user?.name}</p>
+                                    <p className="text-sm text-gray-500">{user?.email}</p>
                                 </div>
                                 <div className="p-1">
                                     <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">
@@ -172,7 +205,7 @@ export function Header() {
                                     </button>
                                     <button
                                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#CD3529] hover:bg-red-50 rounded-md"
-                                        onClick={() => alert('Autenticación pendiente de implementar')}
+                                        onClick={() => signOut({ callbackUrl: '/login' })}
                                     >
                                         <LogOut size={16} />
                                         <span>Cerrar Sesión</span>
@@ -196,4 +229,3 @@ export function Header() {
         </header>
     );
 }
-/* Updated: Fri Dec 26 21:09:04 -05 2025 */

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import {
     LayoutDashboard,
     FileText,
@@ -34,10 +35,10 @@ const navItems: NavItem[] = [
 export function Sidebar() {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
+    const { data: session } = useSession();
 
-    // TEMPORAL: Mostrar Configuración a todos los usuarios
-    // TODO: Implementar verificación de rol con next-auth
-    const isAdmin = true;
+    // Verificar rol de admin desde la sesión real
+    const isAdmin = (session?.user as { role?: string })?.role === 'ADMIN';
 
     const visibleItems = navItems.filter(item => !item.adminOnly || isAdmin);
 
