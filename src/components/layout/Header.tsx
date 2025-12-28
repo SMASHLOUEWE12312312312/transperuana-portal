@@ -174,13 +174,13 @@ export function Header() {
                 {/* Logo */}
                 <div className="flex items-center gap-3 flex-shrink-0">
                     <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-                        {/* Mobile: isotipo grande */}
-                        <div className="sm:hidden flex-shrink-0">
-                            <BrandLogo variant="mark" size="lg" />
+                        {/* Mobile: isotipo */}
+                        <div className="sm:hidden">
+                            <BrandLogo variant="mark" headerMode />
                         </div>
-                        {/* Desktop: wordmark completo */}
-                        <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
-                            <BrandLogo variant="wordmark" size="sm" />
+                        {/* Desktop: wordmark + subtitle */}
+                        <div className="hidden sm:flex items-center gap-3">
+                            <BrandLogo variant="wordmark" headerMode />
                             <div>
                                 <p className="text-xs text-gray-500">Portal de Monitoreo ETL</p>
                             </div>
