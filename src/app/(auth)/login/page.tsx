@@ -4,6 +4,7 @@
  */
 import { signIn, auth } from "@/auth"
 import { redirect } from "next/navigation"
+import { BrandLogo } from "@/components/brand/BrandLogo"
 
 export default async function LoginPage(props: {
     searchParams: Promise<{ error?: string; callbackUrl?: string }>
@@ -23,16 +24,8 @@ export default async function LoginPage(props: {
                 <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
                     {/* Logo */}
                     <div className="text-center">
-                        <div className="w-16 h-16 bg-[#CD3529] rounded-xl mx-auto mb-4 flex items-center justify-center shadow-lg">
-                            <svg viewBox="0 0 40 40" className="w-10 h-10">
-                                <g fill="white">
-                                    <path d="M20 5C15 5 11 10 11 15C11 18 12 20 14 22C10 22 5 24 5 30C5 32 8 34 12 34C16 34 19 31 20 28C21 31 24 34 28 34C32 34 35 32 35 30C35 24 30 22 26 22C28 20 29 18 29 15C29 10 25 5 20 5Z" opacity="0.95" />
-                                </g>
-                            </svg>
-                        </div>
-                        <div className="flex items-center justify-center gap-0.5 mb-2">
-                            <span className="text-2xl font-bold text-gray-700">Trans</span>
-                            <span className="text-2xl font-bold text-[#CD3529]">peruana</span>
+                        <div className="flex justify-center mb-4">
+                            <BrandLogo variant="wordmark" size="lg" priority />
                         </div>
                         <h1 className="text-xl font-semibold text-gray-900">Portal de Monitoreo ETL</h1>
                         <p className="text-sm text-gray-500 mt-1">Sistema de Renovaciones SCTR / VIDA LEY</p>

@@ -19,8 +19,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Portal de Monitoreo ETL | Transperuana",
-  description: "Sistema de monitoreo y gestión de tramas SCTR/VIDA LEY - Transperuana Corredores de Seguros S.A.",
+  title: "Transperuana | Portal de Monitoreo ETL",
+  description: "Sistema de Renovaciones SCTR / Vida Ley - Transperuana Corredores de Seguros S.A.",
   keywords: ["Transperuana", "SCTR", "VIDA LEY", "ETL", "Seguros", "Monitoreo"],
 };
 

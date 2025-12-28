@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 
 interface Notification {
     id: string;
@@ -150,10 +151,11 @@ export function Header() {
             <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-50">
                 <div className="flex items-center justify-between h-full px-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#CD3529] flex items-center justify-center">
-                            <span className="text-white font-bold text-lg">T</span>
+                        <div className="w-10 h-10 rounded-lg bg-gray-200 animate-pulse" />
+                        <div className="hidden sm:block">
+                            <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+                            <div className="h-3 w-32 bg-gray-100 rounded mt-1 animate-pulse" />
                         </div>
-                        <span className="font-semibold text-gray-800">Transperuana</span>
                     </div>
                     <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
                 </div>
@@ -171,20 +173,21 @@ export function Header() {
             <div className="flex items-center justify-between h-full px-4">
                 {/* Logo */}
                 <div className="flex items-center gap-3">
-                    <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
-                        <div className="w-10 h-10 rounded-xl bg-[#CD3529] flex items-center justify-center shadow-sm">
-                            <svg viewBox="0 0 40 40" className="w-6 h-6">
-                                <g fill="white">
-                                    <path d="M20 5C15 5 11 10 11 15C11 18 12 20 14 22C10 22 5 24 5 30C5 32 8 34 12 34C16 34 19 31 20 28C21 31 24 34 28 34C32 34 35 32 35 30C35 24 30 22 26 22C28 20 29 18 29 15C29 10 25 5 20 5Z" opacity="0.95" />
-                                </g>
-                            </svg>
+                    <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+                        {/* Mobile: isotipo */}
+                        <div className="sm:hidden">
+                            <BrandLogo variant="mark" size="sm" />
                         </div>
-                        <div className="hidden sm:block">
-                            <div className="flex items-center gap-0.5">
-                                <span className="font-semibold text-gray-700">Trans</span>
-                                <span className="font-semibold text-[#CD3529]">peruana</span>
+                        {/* Desktop: wordmark + subtitle */}
+                        <div className="hidden sm:flex items-center gap-2">
+                            <BrandLogo variant="mark" size="sm" />
+                            <div>
+                                <div className="flex items-center gap-0.5">
+                                    <span className="font-semibold text-gray-700">Trans</span>
+                                    <span className="font-semibold text-[#CD3529]">peruana</span>
+                                </div>
+                                <p className="text-xs text-gray-500">Portal de Monitoreo ETL</p>
                             </div>
-                            <p className="text-xs text-gray-500">Portal de Monitoreo ETL</p>
                         </div>
                     </Link>
                 </div>
