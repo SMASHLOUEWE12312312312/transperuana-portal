@@ -176,11 +176,11 @@ export function Header() {
                     <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
                         {/* Mobile: isotipo */}
                         <div className="sm:hidden">
-                            <BrandLogo variant="mark" size="sm" />
+                            <BrandLogo variant="mark" size="lg" />
                         </div>
                         {/* Desktop: wordmark + subtitle */}
                         <div className="hidden sm:flex items-center gap-2">
-                            <BrandLogo variant="mark" size="sm" />
+                            <BrandLogo variant="mark" size="lg" />
                             <div>
                                 <div className="flex items-center gap-0.5">
                                     <span className="font-semibold text-gray-700">Trans</span>
