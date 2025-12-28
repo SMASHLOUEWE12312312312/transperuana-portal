@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, User, LogOut, ChevronDown, ExternalLink, CheckCircle, AlertTriangle, XCircle, Info } from 'lucide-react';
+import { Bell, LogOut, ChevronDown, ExternalLink, CheckCircle, AlertTriangle, XCircle, Info } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link';
@@ -57,7 +57,15 @@ export function Header() {
 
         try {
             setIsLoadingNotifications(true);
-            const response = await fetch('/api/apps-script?action=alertas&limite=10');
+
+            // Timeout de 8 segundos para evitar loading infinito
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+            const response = await fetch('/api/apps-script?action=alertas&limite=10', {
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
 
             if (response.ok) {
                 const data = await response.json();
@@ -81,7 +89,10 @@ export function Header() {
                 setUnreadCount(0);
             }
         } catch (error) {
-            console.error('Error cargando notificaciones:', error);
+            // Error silencioso para timeout o errores de red
+            if (error instanceof Error && error.name === 'AbortError') {
+                console.log('Notificaciones: timeout alcanzado');
+            }
             setNotifications([]);
             setUnreadCount(0);
         } finally {
@@ -328,20 +339,6 @@ export function Header() {
                                 </div>
 
                                 <div className="p-1">
-                                    <button
-                                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-400 rounded-lg cursor-not-allowed"
-                                        disabled
-                                        title="Próximamente"
-                                    >
-                                        <User size={18} />
-                                        <span>Mi Perfil</span>
-                                        <span className="ml-auto text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">
-                                            Próximo
-                                        </span>
-                                    </button>
-
-                                    <hr className="my-1 border-gray-100" />
-
                                     <button
                                         className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-[#CD3529] hover:bg-red-50 rounded-lg transition-colors"
                                         onClick={() => signOut({ callbackUrl: '/login' })}
