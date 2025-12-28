@@ -24,8 +24,8 @@ export default async function LoginPage(props: {
                 <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
                     {/* Logo */}
                     <div className="text-center">
-                        <div className="flex justify-center mb-6">
-                            <BrandLogo variant="wordmark" size="xl" priority className="mx-auto" />
+                        <div className="flex justify-center mb-4">
+                            <BrandLogo variant="wordmark" size="lg" priority className="mx-auto" />
                         </div>
                         <h1 className="text-xl font-semibold text-gray-900">Portal de Monitoreo ETL</h1>
                         <p className="text-sm text-gray-500 mt-1">Sistema de Renovaciones SCTR / VIDA LEY</p>

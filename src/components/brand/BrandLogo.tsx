@@ -17,7 +17,7 @@ interface BrandLogoProps {
 // Mark: solo isotipo (cuadrado)
 const WORDMARK_SIZES: Record<LogoSize, { width: number; height: number }> = {
     sm: { width: 140, height: 140 },
-    md: { width: 180, height: 180 },
+    md: { width: 200, height: 200 },
     lg: { width: 230, height: 230 },
     xl: { width: 280, height: 280 },
 };

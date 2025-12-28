@@ -172,20 +172,16 @@ export function Header() {
         <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-50">
             <div className="flex items-center justify-between h-full px-4">
                 {/* Logo */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-shrink-0">
                     <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-                        {/* Mobile: isotipo */}
-                        <div className="sm:hidden">
+                        {/* Mobile: isotipo grande */}
+                        <div className="sm:hidden flex-shrink-0">
                             <BrandLogo variant="mark" size="lg" />
                         </div>
-                        {/* Desktop: wordmark + subtitle */}
-                        <div className="hidden sm:flex items-center gap-2">
-                            <BrandLogo variant="mark" size="lg" />
+                        {/* Desktop: wordmark completo */}
+                        <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
+                            <BrandLogo variant="wordmark" size="sm" />
                             <div>
-                                <div className="flex items-center gap-0.5">
-                                    <span className="font-semibold text-gray-700">Trans</span>
-                                    <span className="font-semibold text-[#CD3529]">peruana</span>
-                                </div>
                                 <p className="text-xs text-gray-500">Portal de Monitoreo ETL</p>
                             </div>
                         </div>
