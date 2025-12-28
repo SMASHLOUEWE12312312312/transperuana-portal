@@ -1,15 +1,32 @@
 'use client';
 
-import { Bell, User, LogOut, ChevronDown } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { Bell, User, LogOut, ChevronDown, ExternalLink, CheckCircle, AlertTriangle, XCircle, Info } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession, signOut } from 'next-auth/react';
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 interface Notification {
     id: string;
-    message: string;
-    time: string;
-    type: 'warning' | 'info' | 'error' | 'success';
+    titulo: string;
+    message?: string;
+    tipo: 'warning' | 'info' | 'error' | 'success';
+    timestamp?: string;
 }
+
+const NOTIFICATION_ICONS = {
+    success: CheckCircle,
+    error: XCircle,
+    warning: AlertTriangle,
+    info: Info,
+};
+
+const NOTIFICATION_COLORS = {
+    success: 'text-green-500 bg-green-50',
+    error: 'text-red-500 bg-red-50',
+    warning: 'text-amber-500 bg-amber-50',
+    info: 'text-blue-500 bg-blue-50',
+};
 
 export function Header() {
     const { data: session, status } = useSession();
@@ -17,6 +34,10 @@ export function Header() {
     const [showNotifications, setShowNotifications] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    const notifRef = useRef<HTMLDivElement>(null);
+    const userMenuRef = useRef<HTMLDivElement>(null);
 
     // Usuario desde la sesión
     const user = session?.user ? {
@@ -26,9 +47,8 @@ export function Header() {
         image: session.user.image
     } : null;
 
-    // Cargar notificaciones desde la API
+    // Cargar notificaciones
     const loadNotifications = useCallback(async () => {
-        // Solo cargar si hay sesión
         if (status !== 'authenticated') {
             setNotifications([]);
             setIsLoadingNotifications(false);
@@ -37,58 +57,102 @@ export function Header() {
 
         try {
             setIsLoadingNotifications(true);
-            const response = await fetch('/api/apps-script?action=alertas');
+            const response = await fetch('/api/apps-script?action=alertas&limite=10');
+
             if (response.ok) {
                 const data = await response.json();
                 if (data.success && data.alertas) {
-                    const notifs = data.alertas.slice(0, 5).map((a: { id?: string; titulo?: string; message?: string; tipo?: string }, idx: number) => ({
-                        id: a.id || String(idx),
-                        message: a.titulo || a.message || 'Notificación',
-                        time: 'Reciente',
-                        type: (a.tipo || 'info') as 'warning' | 'info' | 'error' | 'success'
-                    }));
-                    setNotifications(notifs);
-                    return;
+                    setNotifications(data.alertas);
+
+                    // Calcular no leídas basado en localStorage
+                    const lastSeen = localStorage.getItem('notif_last_seen');
+                    const lastSeenTime = lastSeen ? new Date(lastSeen).getTime() : 0;
+                    const unread = data.alertas.filter((n: Notification) => {
+                        if (!n.timestamp) return true; // Sin timestamp = nueva
+                        return new Date(n.timestamp).getTime() > lastSeenTime;
+                    }).length;
+                    setUnreadCount(unread);
+                } else {
+                    setNotifications([]);
+                    setUnreadCount(0);
                 }
+            } else {
+                setNotifications([]);
+                setUnreadCount(0);
             }
-            // Si falla, dejar vacío (NO usar mock)
-            setNotifications([]);
         } catch (error) {
             console.error('Error cargando notificaciones:', error);
             setNotifications([]);
+            setUnreadCount(0);
         } finally {
             setIsLoadingNotifications(false);
         }
     }, [status]);
 
+    // Marcar como leídas al abrir
+    const handleOpenNotifications = () => {
+        setShowNotifications(!showNotifications);
+        setShowUserMenu(false);
+
+        if (!showNotifications && notifications.length > 0) {
+            localStorage.setItem('notif_last_seen', new Date().toISOString());
+            setUnreadCount(0);
+        }
+    };
+
+    // Cargar y polling
     useEffect(() => {
         loadNotifications();
-        const interval = setInterval(loadNotifications, 120000);
+        const interval = setInterval(loadNotifications, 120000); // 2 min
         return () => clearInterval(interval);
     }, [loadNotifications]);
 
-    // Cerrar menús al hacer clic fuera
+    // Click outside para cerrar
     useEffect(() => {
-        const handleClickOutside = () => {
-            setShowUserMenu(false);
-            setShowNotifications(false);
+        const handleClickOutside = (event: MouseEvent) => {
+            if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+                setShowNotifications(false);
+            }
+            if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+                setShowUserMenu(false);
+            }
         };
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Si está cargando la sesión, mostrar header básico
+    // Keyboard navigation
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setShowNotifications(false);
+                setShowUserMenu(false);
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
+    // Loading state del header
     if (status === 'loading') {
         return (
             <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-50">
                 <div className="flex items-center justify-between h-full px-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
-                        <div className="h-5 w-32 bg-gray-200 rounded animate-pulse"></div>
+                        <div className="w-10 h-10 rounded-xl bg-[#CD3529] flex items-center justify-center">
+                            <span className="text-white font-bold text-lg">T</span>
+                        </div>
+                        <span className="font-semibold text-gray-800">Transperuana</span>
                     </div>
+                    <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
                 </div>
             </header>
         );
+    }
+
+    // No renderizar si no hay sesión
+    if (!session) {
+        return null;
     }
 
     return (
@@ -96,118 +160,194 @@ export function Header() {
             <div className="flex items-center justify-between h-full px-4">
                 {/* Logo */}
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 flex items-center justify-center">
-                            <svg viewBox="0 0 40 40" className="w-full h-full">
-                                <g fill="#CD3529">
-                                    <path d="M20 5C15 5 11 10 11 15C11 18 12 20 14 22C10 22 5 24 5 30C5 32 8 34 12 34C16 34 19 31 20 28C21 31 24 34 28 34C32 34 35 32 35 30C35 24 30 22 26 22C28 20 29 18 29 15C29 10 25 5 20 5Z" opacity="0.9" />
+                    <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+                        <div className="w-10 h-10 rounded-xl bg-[#CD3529] flex items-center justify-center shadow-sm">
+                            <svg viewBox="0 0 40 40" className="w-6 h-6">
+                                <g fill="white">
+                                    <path d="M20 5C15 5 11 10 11 15C11 18 12 20 14 22C10 22 5 24 5 30C5 32 8 34 12 34C16 34 19 31 20 28C21 31 24 34 28 34C32 34 35 32 35 30C35 24 30 22 26 22C28 20 29 18 29 15C29 10 25 5 20 5Z" opacity="0.95" />
                                 </g>
                             </svg>
                         </div>
-                        <div className="flex items-baseline">
-                            <span className="text-xl font-bold text-gray-700">Trans</span>
-                            <span className="text-xl font-bold text-[#CD3529]">peruana</span>
+                        <div className="hidden sm:block">
+                            <div className="flex items-center gap-0.5">
+                                <span className="font-semibold text-gray-700">Trans</span>
+                                <span className="font-semibold text-[#CD3529]">peruana</span>
+                            </div>
+                            <p className="text-xs text-gray-500">Portal de Monitoreo ETL</p>
                         </div>
-                    </div>
-                    <span className="text-xs text-gray-400 hidden sm:block">|</span>
-                    <span className="text-sm text-gray-500 hidden sm:block">Portal de Monitoreo ETL</span>
+                    </Link>
                 </div>
 
                 {/* Right Side */}
                 <div className="flex items-center gap-2">
                     {/* Notifications */}
-                    <div className="relative">
+                    <div className="relative" ref={notifRef}>
                         <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setShowNotifications(!showNotifications);
-                                setShowUserMenu(false);
-                            }}
-                            className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                            aria-label="Notificaciones"
+                            onClick={handleOpenNotifications}
+                            className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#CD3529]/20"
+                            aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ''}`}
+                            aria-expanded={showNotifications}
+                            aria-haspopup="true"
                         >
                             <Bell size={20} className="text-gray-600" />
-                            {notifications.length > 0 && (
-                                <span className="absolute top-1 right-1 w-4 h-4 bg-[#CD3529] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                                    {notifications.length}
+                            {unreadCount > 0 && (
+                                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-[#CD3529] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 animate-pulse">
+                                    {unreadCount > 9 ? '9+' : unreadCount}
                                 </span>
                             )}
                         </button>
 
                         {showNotifications && (
-                            <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 animate-slideIn">
-                                <div className="p-3 border-b border-gray-200">
+                            <div
+                                className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-slideIn"
+                                role="menu"
+                            >
+                                <div className="p-3 border-b border-gray-100 bg-gray-50/50">
                                     <h3 className="font-semibold text-gray-900">Notificaciones</h3>
+                                    <p className="text-xs text-gray-500">Actividad reciente del sistema</p>
                                 </div>
-                                <div className="max-h-64 overflow-y-auto">
+
+                                <div className="max-h-80 overflow-y-auto">
                                     {isLoadingNotifications ? (
-                                        <div className="p-4 text-center text-gray-500">
-                                            <div className="w-5 h-5 border-2 border-gray-300 border-t-[#CD3529] rounded-full animate-spin mx-auto mb-2"></div>
-                                            Cargando...
+                                        <div className="p-8 text-center">
+                                            <div className="w-6 h-6 border-2 border-gray-200 border-t-[#CD3529] rounded-full animate-spin mx-auto mb-2" />
+                                            <p className="text-sm text-gray-500">Cargando...</p>
                                         </div>
                                     ) : notifications.length === 0 ? (
-                                        <div className="p-4 text-center text-gray-500">
-                                            No hay notificaciones
+                                        <div className="p-8 text-center">
+                                            <Bell size={32} className="text-gray-300 mx-auto mb-2" />
+                                            <p className="text-sm text-gray-500 font-medium">No hay notificaciones</p>
+                                            <p className="text-xs text-gray-400 mt-1">Las actividades recientes aparecerán aquí</p>
                                         </div>
                                     ) : (
-                                        notifications.map((notif) => (
-                                            <div key={notif.id} className="p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
-                                                <p className="text-sm text-gray-700">{notif.message}</p>
-                                                <p className="text-xs text-gray-400 mt-1">{notif.time}</p>
-                                            </div>
-                                        ))
+                                        notifications.map((notif) => {
+                                            const IconComponent = NOTIFICATION_ICONS[notif.tipo] || Info;
+                                            const colorClass = NOTIFICATION_COLORS[notif.tipo] || NOTIFICATION_COLORS.info;
+
+                                            return (
+                                                <Link
+                                                    key={notif.id}
+                                                    href={notif.id === 'errores' ? '/errores' : '/procesos'}
+                                                    className="block p-3 hover:bg-gray-50 border-b border-gray-50 last:border-b-0 transition-colors"
+                                                    onClick={() => setShowNotifications(false)}
+                                                >
+                                                    <div className="flex gap-3">
+                                                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0", colorClass)}>
+                                                            <IconComponent size={16} />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium text-gray-900 truncate">
+                                                                {notif.titulo}
+                                                            </p>
+                                                            {notif.message && (
+                                                                <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">
+                                                                    {notif.message}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <ExternalLink size={14} className="text-gray-300 flex-shrink-0 mt-1" />
+                                                    </div>
+                                                </Link>
+                                            );
+                                        })
                                     )}
                                 </div>
+
+                                {notifications.length > 0 && (
+                                    <div className="p-2 border-t border-gray-100 bg-gray-50/50">
+                                        <Link
+                                            href="/procesos"
+                                            className="block text-center text-xs text-[#CD3529] hover:text-[#b02d23] font-medium py-1"
+                                            onClick={() => setShowNotifications(false)}
+                                        >
+                                            Ver todos los procesos →
+                                        </Link>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
 
                     {/* User Menu */}
-                    <div className="relative">
+                    <div className="relative" ref={userMenuRef}>
                         <button
-                            onClick={(e) => {
-                                e.stopPropagation();
+                            onClick={() => {
                                 setShowUserMenu(!showUserMenu);
                                 setShowNotifications(false);
                             }}
-                            className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                            className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#CD3529]/20"
+                            aria-label="Menú de usuario"
+                            aria-expanded={showUserMenu}
+                            aria-haspopup="true"
                         >
-                            {/* Avatar - usar imagen de Google si existe */}
                             {user?.image ? (
                                 <img
                                     src={user.image}
-                                    alt={user.name}
-                                    className="w-8 h-8 rounded-full object-cover"
+                                    alt=""
+                                    className="w-8 h-8 rounded-full object-cover ring-2 ring-gray-100"
                                     referrerPolicy="no-referrer"
                                 />
                             ) : (
-                                <div className="w-8 h-8 rounded-full bg-[#CD3529] text-white flex items-center justify-center">
-                                    <span className="text-sm font-medium">{user?.name?.[0] || 'U'}</span>
+                                <div className="w-8 h-8 rounded-full bg-[#CD3529] text-white flex items-center justify-center ring-2 ring-gray-100">
+                                    <span className="text-sm font-medium">
+                                        {user?.name?.[0]?.toUpperCase() || 'U'}
+                                    </span>
                                 </div>
                             )}
                             <div className="hidden md:block text-left">
-                                <p className="text-sm font-medium text-gray-700">{user?.name || 'Usuario'}</p>
-                                <p className="text-xs text-gray-500">{user?.role || 'Usuario'}</p>
+                                <p className="text-sm font-medium text-gray-700 max-w-[120px] truncate">
+                                    {user?.name || 'Usuario'}
+                                </p>
+                                <p className="text-xs text-gray-500">{user?.role}</p>
                             </div>
-                            <ChevronDown size={16} className="text-gray-400 hidden md:block" />
+                            <ChevronDown
+                                size={16}
+                                className={cn(
+                                    "text-gray-400 hidden md:block transition-transform duration-200",
+                                    showUserMenu && "rotate-180"
+                                )}
+                            />
                         </button>
 
                         {showUserMenu && (
-                            <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 animate-slideIn">
-                                <div className="p-3 border-b border-gray-200">
-                                    <p className="font-medium text-gray-900">{user?.name}</p>
-                                    <p className="text-sm text-gray-500">{user?.email}</p>
+                            <div
+                                className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-slideIn"
+                                role="menu"
+                            >
+                                <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+                                    <p className="font-medium text-gray-900 truncate">{user?.name}</p>
+                                    <p className="text-sm text-gray-500 truncate">{user?.email}</p>
+                                    <span className={cn(
+                                        "inline-block mt-2 text-xs font-medium px-2 py-0.5 rounded-full",
+                                        user?.role === 'ADMIN'
+                                            ? "bg-purple-100 text-purple-700"
+                                            : "bg-blue-100 text-blue-700"
+                                    )}>
+                                        {user?.role === 'ADMIN' ? '👑 Administrador' : '👤 Ejecutivo'}
+                                    </span>
                                 </div>
+
                                 <div className="p-1">
-                                    <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">
-                                        <User size={16} />
-                                        <span>Mi Perfil</span>
-                                    </button>
                                     <button
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#CD3529] hover:bg-red-50 rounded-md"
-                                        onClick={() => signOut({ callbackUrl: '/login' })}
+                                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-400 rounded-lg cursor-not-allowed"
+                                        disabled
+                                        title="Próximamente"
                                     >
-                                        <LogOut size={16} />
+                                        <User size={18} />
+                                        <span>Mi Perfil</span>
+                                        <span className="ml-auto text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">
+                                            Próximo
+                                        </span>
+                                    </button>
+
+                                    <hr className="my-1 border-gray-100" />
+
+                                    <button
+                                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-[#CD3529] hover:bg-red-50 rounded-lg transition-colors"
+                                        onClick={() => signOut({ callbackUrl: '/login' })}
+                                        role="menuitem"
+                                    >
+                                        <LogOut size={18} />
                                         <span>Cerrar Sesión</span>
                                     </button>
                                 </div>
@@ -216,16 +356,6 @@ export function Header() {
                     </div>
                 </div>
             </div>
-
-            {(showNotifications || showUserMenu) && (
-                <div
-                    className="fixed inset-0 z-[-1]"
-                    onClick={() => {
-                        setShowNotifications(false);
-                        setShowUserMenu(false);
-                    }}
-                />
-            )}
         </header>
     );
 }

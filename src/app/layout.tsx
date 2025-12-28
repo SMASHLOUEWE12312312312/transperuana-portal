@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { Header } from "@/components/layout/Header";
-import { Sidebar } from "@/components/layout/Sidebar";
 import { Providers } from "./providers";
 
 const inter = Inter({
@@ -38,11 +36,7 @@ export default function RootLayout({
         style={{ fontFamily: 'var(--font-inter), sans-serif' }}
       >
         <Providers>
-          <Header />
-          <Sidebar />
-          <main className="ml-64 mt-16 min-h-[calc(100vh-4rem)] p-6 transition-all duration-300">
-            {children}
-          </main>
+          {children}
         </Providers>
       </body>
     </html>
