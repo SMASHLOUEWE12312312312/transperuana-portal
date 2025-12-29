@@ -71,26 +71,35 @@ function formatDateTime(date: Date | null): string {
 }
 
 // Transform API response to BitacoraCorreo
+// Mapea campos del API a estructura interna, con fallbacks para nombres del Sheet
 function transformBitacora(b: Record<string, unknown>): BitacoraCorreo {
+    // Acceso seguro a propiedades con acentos
+    const bAny = b as Record<string, unknown>;
+
     return {
         timestamp: parseTimestampSafe(b.timestamp, b.Timestamp, b.FechaHora, b.fechaCorreo),
         messageId: (b.messageId as string) || (b.MessageId as string) || '',
         threadId: (b.threadId as string) || (b.ThreadId as string) || '',
         subject: (b.subject as string) || (b.Subject as string) || (b.Asunto as string) || '',
-        sender: (b.sender as string) || (b.Sender as string) || (b.Remitente as string) || '',
-        attachmentName: (b.attachmentName as string) || (b.AttachmentName as string) || (b.Adjunto as string) || '',
+        sender: (b.sender as string) || (b.Sender as string) || (b.Remitente as string) || (b.from as string) || (b.From as string) || '',
+        attachmentName: (b.attachmentName as string) || (b.AttachmentName as string) || (b.Adjunto as string) || (b.attachment as string) || (b.Attachment as string) || '',
         attachmentType: (b.attachmentType as string) || '',
-        companiaDetectada: ((b.companiaDetectada as string) || (b.CompaniaDetectada as string) || null) as Compania | null,
-        tipoSeguroDetectado: ((b.tipoSeguroDetectado as string) || (b.TipoSeguroDetectado as string) || null) as TipoSeguro | null,
-        confidenceScore: Number(b.confidenceScore || b.ConfidenceScore || 0),
-        detectionMethod: (b.detectionMethod as string) || '',
+        // Compañía: múltiples fallbacks incluyendo acentos
+        companiaDetectada: ((b.companiaDetectada ?? b.CompaniaDetectada ?? b.compania ?? b.Compania ?? bAny['Compañía'] ?? null) as string | null) as Compania | null,
+        // Tipo Seguro
+        tipoSeguroDetectado: ((b.tipoSeguroDetectado ?? b.TipoSeguroDetectado ?? b.tipoSeguro ?? b.TipoSeguro ?? null) as string | null) as TipoSeguro | null,
+        // Score/Confianza
+        confidenceScore: Number(b.confidenceScore ?? b.ConfidenceScore ?? b.score ?? b.Score ?? 0),
+        // Método Detección con acentos
+        detectionMethod: (b.detectionMethod as string) || (b.metodoDeteccion as string) || (b.MetodoDeteccion as string) || (bAny['MétodoDetección'] as string) || '',
         labelRoute: (b.labelRoute as string) || '',
         fileIdRaw: (b.fileIdRaw as string) || '',
         fileIdReady: (b.fileIdReady as string) || null,
-        processingResult: ((b.processingResult as string) || (b.ProcessingResult as string) || (b.Estado as string) || 'PENDIENTE') as 'PROCESADO' | 'PENDIENTE' | 'ERROR' | 'IGNORADO',
+        processingResult: ((b.processingResult ?? b.ProcessingResult ?? b.Estado ?? b.estado ?? 'PENDIENTE') as string).toUpperCase() as 'PROCESADO' | 'PENDIENTE' | 'ERROR' | 'IGNORADO',
         idProceso: (b.idProceso as string) || (b.IdProceso as string) || null,
-        errorDetail: (b.errorDetail as string) || null,
-        processingTime: Number(b.processingTime || 0)
+        errorDetail: (b.errorDetail as string) || (b.ErrorResumen as string) || (b.errorResumen as string) || null,
+        // Tiempo procesamiento con acentos
+        processingTime: Number(b.processingTime ?? b.ProcessingTime ?? b.duracionSeg ?? b.DuracionSeg ?? bAny['DuraciónSeg'] ?? 0)
     };
 }
 
