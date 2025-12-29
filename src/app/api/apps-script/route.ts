@@ -71,8 +71,11 @@ export async function GET(request: NextRequest) {
         const cacheKey = url.toString() + '_user_' + userEmail;
 
         // Verificar cache (excepto para acciones que necesitan datos frescos)
+        // users.* siempre fresco para evitar "Acción no reconocida" por cache stale
         const freshActions = ['ping', 'reprocesar'];
-        if (!freshActions.includes(action)) {
+        const noCache = action.startsWith('users.') || freshActions.includes(action);
+
+        if (!noCache) {
             const cached = cache.get(cacheKey);
             if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
                 console.log(`[API Proxy] Cache HIT para: ${action} (${userEmail})`);
