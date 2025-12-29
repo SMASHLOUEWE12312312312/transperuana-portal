@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { fetchConfig } from '@/lib/api';
 import { ServerConfigResponse } from '@/lib/server-api';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import { Users, FileText, Settings, Shield, Plus, Pencil, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 
 interface ConfigData {
@@ -42,7 +43,7 @@ export function ConfiguracionClient({ initialData }: ConfiguracionClientProps) {
                 plantillas: data.plantillas
             });
             setLastUpdated(new Date());
-            console.log('[Configuración] Datos actualizados');
+            logger.info('[Configuración] Datos actualizados');
         } catch (error) {
             console.error('[Configuración] Error al refrescar:', error);
         } finally {

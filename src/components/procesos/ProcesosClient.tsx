@@ -10,6 +10,7 @@ import { fetchProcesos } from '@/lib/api';
 import { ServerProcesosResponse } from '@/lib/server-api';
 import { Proceso, Compania, TipoSeguro, EstadoProceso } from '@/lib/types';
 import { formatDateTime, formatDuration, truncate, cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import { Eye, Download, FileWarning, FileText, RefreshCw, AlertTriangle, User, Users } from 'lucide-react';
 
 // Type for API response proceso
@@ -96,7 +97,7 @@ export function ProcesosClient({ initialData, userRole, userEmail }: ProcesosCli
             setProcesos(transformed);
             setTotalProcesos(data.total);
             setLastUpdated(new Date());
-            console.log('[Procesos] Datos actualizados, ownerEmail:', ownerEmail);
+            logger.info('[Procesos] Datos actualizados, ownerEmail:', ownerEmail);
         } catch (error) {
             console.error('[Procesos] Error al refrescar:', error);
         } finally {
@@ -142,26 +143,7 @@ export function ProcesosClient({ initialData, userRole, userEmail }: ProcesosCli
         });
     }, [filters, procesos]);
 
-    // Handle null initialData - error state
-    if (!initialData) {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="text-center">
-                    <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-                    <h2 className="text-lg font-semibold text-gray-900">No se pudieron cargar los procesos</h2>
-                    <p className="text-gray-500 mt-2">Verifica la conexión con el sistema</p>
-                    <button
-                        onClick={refreshData}
-                        className="mt-4 px-4 py-2 bg-[#CD3529] text-white rounded-lg hover:bg-[#b02d23] transition-colors"
-                    >
-                        Reintentar
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
-    const columns: Column<Proceso>[] = [
+    const columns = useMemo<Column<Proceso>[]>(() => [
         {
             key: 'idProceso',
             label: 'ID',
@@ -250,7 +232,6 @@ export function ProcesosClient({ initialData, userRole, userEmail }: ProcesosCli
             width: '140px',
             render: (value: unknown) => {
                 const email = String(value || '');
-                // Mostrar solo la parte antes del @
                 const displayName = email.includes('@') ? email.split('@')[0] : email;
                 return (
                     <span className="text-sm text-gray-600" title={email}>
@@ -300,7 +281,26 @@ export function ProcesosClient({ initialData, userRole, userEmail }: ProcesosCli
                 </div>
             )
         }
-    ];
+    ], [isAdmin]);
+
+    // Handle null initialData - error state (AFTER all hooks)
+    if (!initialData) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="text-center">
+                    <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+                    <h2 className="text-lg font-semibold text-gray-900">No se pudieron cargar los procesos</h2>
+                    <p className="text-gray-500 mt-2">Verifica la conexión con el sistema</p>
+                    <button
+                        onClick={refreshData}
+                        className="mt-4 px-4 py-2 bg-[#CD3529] text-white rounded-lg hover:bg-[#b02d23] transition-colors"
+                    >
+                        Reintentar
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 animate-fadeIn">

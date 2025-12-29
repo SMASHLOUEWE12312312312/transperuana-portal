@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
-import { Users, UserPlus, Search, CheckCircle, XCircle, Clock, Shield, Edit, RefreshCw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Users, UserPlus, Search, CheckCircle, XCircle, Clock, Edit, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Usuario {
@@ -27,7 +28,8 @@ const ESTADO_ICONS: Record<string, React.ElementType> = {
 };
 
 export default function UsuariosPage() {
-    const { data: session } = useSession();
+    const { data: session, status } = useSession();
+    const router = useRouter();
     const [usuarios, setUsuarios] = useState<Usuario[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -39,6 +41,13 @@ export default function UsuariosPage() {
     const userEmail = session?.user?.email || '';
     const userRole = (session?.user as { role?: string })?.role || 'EJECUTIVO';
     const isAdmin = userRole === 'ADMIN';
+
+    // RBAC verification - redirect non-admins
+    useEffect(() => {
+        if (status === 'loading') return;
+        if (status === 'unauthenticated') router.replace('/login');
+        if (userRole !== 'ADMIN') router.replace('/');
+    }, [status, userRole, router]);
 
     const loadUsuarios = useCallback(async () => {
         if (!isAdmin) return;
@@ -59,6 +68,15 @@ export default function UsuariosPage() {
     useEffect(() => {
         if (isAdmin) loadUsuarios();
     }, [isAdmin, loadUsuarios]);
+
+    // Show loading while checking auth - AFTER all hooks
+    if (status === 'loading' || userRole !== 'ADMIN') {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="w-8 h-8 border-2 border-gray-200 border-t-[#CD3529] rounded-full animate-spin mx-auto" />
+            </div>
+        );
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -124,18 +142,6 @@ export default function UsuariosPage() {
         u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
     );
-
-    if (!isAdmin) {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="text-center">
-                    <Shield className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <h2 className="text-lg font-semibold text-gray-900">Acceso Restringido</h2>
-                    <p className="text-gray-500">Solo administradores pueden gestionar usuarios</p>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="space-y-6">

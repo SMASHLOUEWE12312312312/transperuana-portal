@@ -4,6 +4,7 @@
  */
 
 const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL || '';
+import { logger } from './logger';
 
 type ServerFetchOptions = { userScoped?: boolean };
 
@@ -30,7 +31,7 @@ async function serverFetch<T>(
     });
 
     try {
-        console.log(`[Server API] Fetching: ${action}`);
+        logger.info(`[Server API] Fetching: ${action}`);
         const startTime = Date.now();
 
         // AbortController para timeout de 15 segundos
@@ -58,7 +59,7 @@ async function serverFetch<T>(
         const data = await response.json();
         const duration = Date.now() - startTime;
 
-        console.log(`[Server API] ${action} completado en ${duration}ms`);
+        logger.info(`[Server API] ${action} completado en ${duration}ms`);
 
         return data as T;
     } catch (error) {

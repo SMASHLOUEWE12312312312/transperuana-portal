@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { Activity, FileText, CheckCircle, Clock, AlertTriangle, X, RefreshCw } from 'lucide-react';
 import { KPICard } from '@/components/ui/KPICard';
 import { Timeline } from '@/components/ui/Timeline';
@@ -9,6 +10,7 @@ import { fetchDashboard } from '@/lib/api';
 import { formatCompanyName, cn } from '@/lib/utils';
 import { ActivityItem, Compania, TipoError, EstadoProceso } from '@/lib/types';
 import { ServerDashboardResponse } from '@/lib/server-api';
+import { logger } from '@/lib/logger';
 
 type AlertType = 'warning' | 'error' | 'success' | 'info';
 
@@ -20,7 +22,6 @@ interface Alert {
     dismissible: boolean;
 }
 import {
-    AreaChart,
     Area,
     XAxis,
     YAxis,
@@ -33,6 +34,12 @@ import {
     BarChart,
     Bar
 } from 'recharts';
+
+// Lazy load AreaChart for better initial performance
+const LazyAreaChart = dynamic(
+    () => import('recharts').then(mod => ({ default: mod.AreaChart })),
+    { ssr: false, loading: () => <div className="h-72 animate-pulse bg-gray-200 rounded" /> }
+);
 
 const COMPANY_COLORS: Record<string, string> = {
     'RIMAC': '#1E3A8A',
@@ -155,7 +162,7 @@ export function DashboardClient({ initialData }: DashboardClientProps) {
             })));
 
             setLastUpdated(new Date());
-            console.log('[Dashboard] Datos actualizados');
+            logger.info('[Dashboard] Datos actualizados');
         } catch (error) {
             console.error('[Dashboard] Error al refrescar:', error);
         } finally {
@@ -348,44 +355,53 @@ export function DashboardClient({ initialData }: DashboardClientProps) {
                     </div>
                     <div className="card-body">
                         <div className="h-72">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={chartData}>
-                                    <defs>
-                                        <linearGradient id="colorProcesos" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#CD3529" stopOpacity={0.2} />
-                                            <stop offset="95%" stopColor="#CD3529" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E5E5" />
-                                    <XAxis
-                                        dataKey="fecha"
-                                        tick={{ fontSize: 12, fill: '#666666' }}
-                                        tickFormatter={(val) => val.slice(5)}
-                                        interval="preserveStartEnd"
-                                    />
-                                    <YAxis
-                                        tick={{ fontSize: 12, fill: '#666666' }}
-                                        width={40}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{
-                                            backgroundColor: 'white',
-                                            border: '1px solid #E5E5E5',
-                                            borderRadius: '8px',
-                                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                                        }}
-                                        labelFormatter={(val) => `Fecha: ${val}`}
-                                    />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="procesos"
-                                        stroke="#CD3529"
-                                        strokeWidth={2}
-                                        fill="url(#colorProcesos)"
-                                        name="Procesos"
-                                    />
-                                </AreaChart>
-                            </ResponsiveContainer>
+                            {chartData.length === 0 ? (
+                                <div className="flex items-center justify-center h-full text-gray-400">
+                                    <div className="text-center">
+                                        <Activity size={32} className="mx-auto mb-2 opacity-50" />
+                                        <p className="text-sm">Sin datos para mostrar</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LazyAreaChart data={chartData}>
+                                        <defs>
+                                            <linearGradient id="colorProcesos" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#CD3529" stopOpacity={0.2} />
+                                                <stop offset="95%" stopColor="#CD3529" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#E5E5E5" />
+                                        <XAxis
+                                            dataKey="fecha"
+                                            tick={{ fontSize: 12, fill: '#666666' }}
+                                            tickFormatter={(val) => val.slice(5)}
+                                            interval="preserveStartEnd"
+                                        />
+                                        <YAxis
+                                            tick={{ fontSize: 12, fill: '#666666' }}
+                                            width={40}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: 'white',
+                                                border: '1px solid #E5E5E5',
+                                                borderRadius: '8px',
+                                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                            }}
+                                            labelFormatter={(val) => `Fecha: ${val}`}
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="procesos"
+                                            stroke="#CD3529"
+                                            strokeWidth={2}
+                                            fill="url(#colorProcesos)"
+                                            name="Procesos"
+                                        />
+                                    </LazyAreaChart>
+                                </ResponsiveContainer>
+                            )}
                         </div>
                     </div>
                 </div>

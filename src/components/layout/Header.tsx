@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import { BrandLogo } from '@/components/brand/BrandLogo';
 
 interface Notification {
@@ -93,7 +94,7 @@ export function Header() {
         } catch (error) {
             // Error silencioso para timeout o errores de red
             if (error instanceof Error && error.name === 'AbortError') {
-                console.log('Notificaciones: timeout alcanzado');
+                logger.debug('Notificaciones: timeout alcanzado');
             }
             setNotifications([]);
             setUnreadCount(0);
@@ -227,8 +228,8 @@ export function Header() {
                                     ) : notifications.length === 0 ? (
                                         <div className="p-8 text-center">
                                             <Bell size={32} className="text-gray-300 mx-auto mb-2" />
-                                            <p className="text-sm text-gray-500 font-medium">No hay notificaciones</p>
-                                            <p className="text-xs text-gray-400 mt-1">Las actividades recientes aparecerán aquí</p>
+                                            <p className="text-sm text-gray-500 font-medium">No tienes notificaciones</p>
+                                            <p className="text-xs text-gray-400 mt-1">Te avisaremos cuando haya actividad</p>
                                         </div>
                                     ) : (
                                         notifications.map((notif) => {

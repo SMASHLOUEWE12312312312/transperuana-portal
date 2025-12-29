@@ -7,6 +7,7 @@
 
 // URL del proxy local - siempre disponible en el mismo dominio
 const API_PROXY_URL = '/api/apps-script';
+import { logger } from './logger';
 
 // Flag para usar mock data (solo si explícitamente deshabilitado)
 const FORCE_MOCK_DATA = process.env.NEXT_PUBLIC_FORCE_MOCK === 'true';
@@ -32,7 +33,7 @@ async function callAPI<T>(action: string, params: Record<string, string> = {}): 
     });
 
     try {
-        console.log(`[API] Llamando: ${action}`);
+        logger.info(`[API] Llamando: ${action}`);
         const startTime = performance.now();
 
         const response = await fetch(url.toString(), {
@@ -55,7 +56,7 @@ async function callAPI<T>(action: string, params: Record<string, string> = {}): 
             throw new Error(data.error || 'Error en la respuesta de la API');
         }
 
-        console.log(`[API] ${action} exitoso (${duration}ms)`);
+        logger.info(`[API] ${action} exitoso (${duration}ms)`);
         return data as T;
 
     } catch (error) {

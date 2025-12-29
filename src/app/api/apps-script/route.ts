@@ -10,9 +10,6 @@ import { auth } from '@/auth';
 const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL || '';
 const APPS_SCRIPT_TOKEN = process.env.APPS_SCRIPT_TOKEN || '';
 
-// Cache simple en memoria para reducir llamadas
-const cache = new Map<string, { data: unknown; timestamp: number }>();
-const CACHE_TTL = 30000; // 30 segundos
 
 export async function GET(request: NextRequest) {
     // ========== PROTECCIÓN: Verificar sesión ==========
@@ -67,21 +64,6 @@ export async function GET(request: NextRequest) {
         }
         // ==========================================
 
-        // Generar clave de cache (incluye email para separar caches por usuario)
-        const cacheKey = url.toString() + '_user_' + userEmail;
-
-        // Verificar cache (excepto para acciones que necesitan datos frescos)
-        // users.* siempre fresco para evitar "Acción no reconocida" por cache stale
-        const freshActions = ['ping', 'reprocesar'];
-        const noCache = action.startsWith('users.') || freshActions.includes(action);
-
-        if (!noCache) {
-            const cached = cache.get(cacheKey);
-            if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-                console.log(`[API Proxy] Cache HIT para: ${action} (${userEmail})`);
-                return NextResponse.json(cached.data);
-            }
-        }
 
         console.log(`[API Proxy] ${userEmail} llamando: ${action}`);
         const startTime = Date.now();
@@ -104,10 +86,6 @@ export async function GET(request: NextRequest) {
 
         console.log(`[API Proxy] ${action} completado en ${duration}ms`);
 
-        // Guardar en cache si fue exitoso
-        if (data.success) {
-            cache.set(cacheKey, { data, timestamp: Date.now() });
-        }
 
         // Retornar respuesta al cliente
         return NextResponse.json(data, {

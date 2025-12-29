@@ -6,6 +6,7 @@ import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { fetchErrores } from '@/lib/api';
 import { ServerErroresResponse } from '@/lib/server-api';
+import { logger } from '@/lib/logger';
 import { ErrorDetalle, TipoError } from '@/lib/types';
 import { formatDateTime, truncate, cn } from '@/lib/utils';
 import { AlertTriangle, Search, ExternalLink, RefreshCw } from 'lucide-react';
@@ -58,7 +59,7 @@ export function ErroresClient({ initialData }: ErroresClientProps) {
             const transformed = data.errores.map((e: APIError) => transformError(e));
             setErrores(transformed);
             setLastUpdated(new Date());
-            console.log('[Errores] Datos actualizados');
+            logger.info('[Errores] Datos actualizados');
         } catch (error) {
             console.error('[Errores] Error al refrescar:', error);
         } finally {

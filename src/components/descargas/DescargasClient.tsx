@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { fetchDescargas } from '@/lib/api';
 import { ServerDescargasResponse } from '@/lib/server-api';
 import { DescargaItem, Compania, TipoSeguro } from '@/lib/types';
+import { logger } from '@/lib/logger';
 import { formatDateTime, formatFileSize, cn } from '@/lib/utils';
 import { Download, FileSpreadsheet, FileWarning, Search, RefreshCw, AlertTriangle } from 'lucide-react';
 
@@ -60,7 +61,7 @@ export function DescargasClient({ initialData }: DescargasClientProps) {
             const transformed = data.descargas.map((d: APIDescarga) => transformDescarga(d));
             setDescargas(transformed);
             setLastUpdated(new Date());
-            console.log('[Descargas] Datos actualizados');
+            logger.info('[Descargas] Datos actualizados');
         } catch (error) {
             console.error('[Descargas] Error al refrescar:', error);
         } finally {

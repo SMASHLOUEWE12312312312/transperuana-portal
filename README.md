@@ -1,38 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Portal Monitoreo ETL - Transperuana
 
-## Getting Started
+Sistema de monitoreo y gestión de procesos ETL para tramas de seguros.
 
-First, run the development server:
+## Stack Tecnológico
+
+- **Framework**: Next.js 16 (App Router)
+- **Autenticación**: NextAuth v5 (Google OAuth)
+- **Estilos**: Tailwind CSS 4
+- **Backend**: Google Apps Script
+
+## Setup Local
 
 ```bash
+# 1. Clonar repositorio
+git clone <repo-url>
+cd transperuana-portal
+
+# 2. Instalar dependencias
+npm install
+
+# 3. Configurar variables de entorno
+cp .env.example .env.local
+# Editar .env.local con tus credenciales
+
+# 4. Ejecutar en desarrollo
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Variables de Entorno
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Descripción |
+|----------|-------------|
+| `GOOGLE_CLIENT_ID` | ID de cliente OAuth de Google |
+| `GOOGLE_CLIENT_SECRET` | Secret de cliente OAuth |
+| `AUTH_SECRET` | Secret para NextAuth (generado) |
+| `APPS_SCRIPT_URL` | URL del Web App de Apps Script |
+| `APPS_SCRIPT_TOKEN` | Token de autenticación para Apps Script |
+| `ALLOWED_DOMAIN` | Dominio permitido (ej: transperuana.com.pe) |
+| `ADMIN_EMAILS` | Lista de emails admin separados por coma |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Estructura del Proyecto
 
-## Learn More
+```
+src/
+├── app/                    # App Router pages
+│   ├── (auth)/             # Páginas de autenticación
+│   ├── (main)/             # Páginas principales
+│   └── api/                # API routes
+├── components/             # Componentes React
+│   ├── ui/                 # Componentes UI genéricos
+│   ├── layout/             # Header, Sidebar
+│   └── [modulo]/           # Componentes por módulo
+├── lib/                    # Utilidades y API
+└── auth.ts                 # Configuración NextAuth
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Roles de Usuario
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Rol | Descripción | Acceso |
+|-----|-------------|--------|
+| **ADMIN** | Administrador | Todo + Configuración + Usuarios |
+| **EJECUTIVO** | Usuario estándar | Solo sus propios procesos |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Scripts
 
-## Deploy on Vercel
+```bash
+npm run dev      # Desarrollo local
+npm run build    # Build de producción
+npm run start    # Iniciar producción
+npm run lint     # Verificar código
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Despliegue
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-Test deploy Wed Dec 24 13:34:17 -05 2025
+El proyecto está configurado para Vercel. El deploy es automático al hacer push a main.

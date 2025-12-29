@@ -6,6 +6,7 @@ import { fetchBitacora } from '@/lib/api';
 import { ServerBitacoraResponse } from '@/lib/server-api';
 import { BitacoraCorreo, Compania, TipoSeguro } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import { Mail, Search, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock, XCircle, RefreshCw, AlertTriangle } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 
@@ -128,7 +129,7 @@ export function BitacoraClient({ initialData }: BitacoraClientProps) {
             const transformed = data.bitacora.map((b: Record<string, unknown>) => transformBitacora(b));
             setBitacora(transformed);
             setLastUpdated(new Date());
-            console.log('[Bitácora] Datos actualizados');
+            logger.info('[Bitácora] Datos actualizados');
         } catch (error) {
             console.error('[Bitácora] Error al refrescar:', error);
         } finally {
