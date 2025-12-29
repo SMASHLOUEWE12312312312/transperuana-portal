@@ -10,9 +10,10 @@ import { BrandLogo } from '@/components/brand/BrandLogo';
 interface Notification {
     id: string;
     titulo: string;
-    message?: string;
+    mensaje?: string;
     tipo: 'warning' | 'info' | 'error' | 'success';
     timestamp?: string;
+    idProceso?: string;
 }
 
 const NOTIFICATION_ICONS = {
@@ -233,11 +234,15 @@ export function Header() {
                                         notifications.map((notif) => {
                                             const IconComponent = NOTIFICATION_ICONS[notif.tipo] || Info;
                                             const colorClass = NOTIFICATION_COLORS[notif.tipo] || NOTIFICATION_COLORS.info;
+                                            // Navegar a proceso si tiene idProceso, sino a lista
+                                            const notifHref = notif.idProceso
+                                                ? `/procesos/${notif.idProceso}`
+                                                : '/procesos';
 
                                             return (
                                                 <Link
                                                     key={notif.id}
-                                                    href={notif.id === 'errores' ? '/errores' : '/procesos'}
+                                                    href={notifHref}
                                                     className="block p-3 hover:bg-gray-50 border-b border-gray-50 last:border-b-0 transition-colors"
                                                     onClick={() => setShowNotifications(false)}
                                                 >
@@ -249,9 +254,17 @@ export function Header() {
                                                             <p className="text-sm font-medium text-gray-900 truncate">
                                                                 {notif.titulo}
                                                             </p>
-                                                            {notif.message && (
+                                                            {notif.mensaje && (
                                                                 <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">
-                                                                    {notif.message}
+                                                                    {notif.mensaje}
+                                                                </p>
+                                                            )}
+                                                            {notif.timestamp && (
+                                                                <p className="text-xs text-gray-400 mt-1">
+                                                                    {new Date(notif.timestamp).toLocaleString('es-PE', {
+                                                                        day: '2-digit', month: '2-digit', year: 'numeric',
+                                                                        hour: '2-digit', minute: '2-digit'
+                                                                    })}
                                                                 </p>
                                                             )}
                                                         </div>
