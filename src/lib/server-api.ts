@@ -5,12 +5,19 @@
 
 const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL || '';
 
+type ServerFetchOptions = { userScoped?: boolean };
+
 /**
  * Fetch optimizado para ISR
  * - Sin cache en memoria (Next.js maneja el cache)
  * - Con timeout para evitar builds lentos
+ * - userScoped=true usa no-store (sin cache) para datos por usuario
  */
-async function serverFetch<T>(action: string, params: Record<string, string> = {}): Promise<T | null> {
+async function serverFetch<T>(
+    action: string,
+    params: Record<string, string> = {},
+    options: ServerFetchOptions = {}
+): Promise<T | null> {
     if (!APPS_SCRIPT_URL) {
         console.error('[Server API] APPS_SCRIPT_URL no configurada');
         return null;
@@ -30,16 +37,16 @@ async function serverFetch<T>(action: string, params: Record<string, string> = {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
 
+        // userScoped: NO cache (datos varían por usuario)
+        // normal: cache con ISR (60s revalidate)
+        const userScoped = Boolean(options.userScoped);
+
         const response = await fetch(url.toString(), {
             method: 'GET',
             redirect: 'follow',
             signal: controller.signal,
-            // Cache de Next.js para ISR - IMPORTANTE
-            cache: 'force-cache',
-            next: {
-                revalidate: 60,
-                tags: [action]
-            }
+            cache: userScoped ? 'no-store' : 'force-cache',
+            ...(userScoped ? {} : { next: { revalidate: 60, tags: [action] } })
         });
 
         clearTimeout(timeoutId);
@@ -178,8 +185,13 @@ export async function getServerDashboard(): Promise<ServerDashboardResponse | nu
     return serverFetch<ServerDashboardResponse>('dashboard');
 }
 
-export async function getServerProcesos(limite = 100): Promise<ServerProcesosResponse | null> {
-    return serverFetch<ServerProcesosResponse>('procesos', { limite: limite.toString() });
+export async function getServerProcesos(limite = 100, ownerEmail = 'ALL'): Promise<ServerProcesosResponse | null> {
+    const userScoped = Boolean(ownerEmail && ownerEmail !== 'ALL');
+    return serverFetch<ServerProcesosResponse>(
+        'procesos',
+        { limite: limite.toString(), ownerEmail },
+        { userScoped }
+    );
 }
 
 export async function getServerErrores(limite = 500): Promise<ServerErroresResponse | null> {

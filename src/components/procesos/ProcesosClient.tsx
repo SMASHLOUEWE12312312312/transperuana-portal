@@ -10,7 +10,7 @@ import { fetchProcesos } from '@/lib/api';
 import { ServerProcesosResponse } from '@/lib/server-api';
 import { Proceso, Compania, TipoSeguro, EstadoProceso } from '@/lib/types';
 import { formatDateTime, formatDuration, truncate, cn } from '@/lib/utils';
-import { Eye, Download, FileWarning, FileText, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Eye, Download, FileWarning, FileText, RefreshCw, AlertTriangle, User, Users } from 'lucide-react';
 
 // Type for API response proceso
 interface APIProceso {
@@ -60,13 +60,18 @@ function transformProceso(p: APIProceso): Proceso {
 
 interface ProcesosClientProps {
     initialData: ServerProcesosResponse | null;
+    userRole: string;
+    userEmail: string;
 }
 
-export function ProcesosClient({ initialData }: ProcesosClientProps) {
+export function ProcesosClient({ initialData, userRole, userEmail }: ProcesosClientProps) {
     const router = useRouter();
     const [filters, setFilters] = useState<Record<string, string>>({});
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+    const [showOnlyMine, setShowOnlyMine] = useState(false); // Toggle para ADMIN
+
+    const isAdmin = userRole === 'ADMIN';
 
     // Initialize with server data
     const [procesos, setProcesos] = useState<Proceso[]>(() => {
@@ -75,22 +80,37 @@ export function ProcesosClient({ initialData }: ProcesosClientProps) {
     });
     const [totalProcesos, setTotalProcesos] = useState(() => initialData?.total || 0);
 
+    // Determinar ownerEmail según rol y toggle
+    const getOwnerEmail = useCallback(() => {
+        if (!isAdmin) return userEmail; // EJECUTIVO siempre filtra por su email
+        return showOnlyMine ? userEmail : 'ALL'; // ADMIN: toggle controla
+    }, [isAdmin, showOnlyMine, userEmail]);
+
     // Refresh function
     const refreshData = useCallback(async () => {
         setIsRefreshing(true);
         try {
-            const data = await fetchProcesos({ limite: 200 });
+            const ownerEmail = getOwnerEmail();
+            const data = await fetchProcesos({ limite: 200, ownerEmail });
             const transformed = data.procesos.map((p: APIProceso) => transformProceso(p));
             setProcesos(transformed);
             setTotalProcesos(data.total);
             setLastUpdated(new Date());
-            console.log('[Procesos] Datos actualizados');
+            console.log('[Procesos] Datos actualizados, ownerEmail:', ownerEmail);
         } catch (error) {
             console.error('[Procesos] Error al refrescar:', error);
         } finally {
             setIsRefreshing(false);
         }
-    }, []);
+    }, [getOwnerEmail]);
+
+    // Refrescar cuando cambia el toggle de ADMIN
+    useEffect(() => {
+        if (isAdmin) {
+            refreshData();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showOnlyMine]);
 
     // Auto-refresh every 60 seconds
     useEffect(() => {
@@ -222,6 +242,23 @@ export function ProcesosClient({ initialData }: ProcesosClientProps) {
                 <span className="text-sm text-gray-500">{formatDuration(Number(value))}</span>
             )
         },
+        // Columna Responsable solo para ADMIN
+        ...(isAdmin ? [{
+            key: 'usuario' as keyof Proceso,
+            label: 'Responsable',
+            sortable: true,
+            width: '140px',
+            render: (value: unknown) => {
+                const email = String(value || '');
+                // Mostrar solo la parte antes del @
+                const displayName = email.includes('@') ? email.split('@')[0] : email;
+                return (
+                    <span className="text-sm text-gray-600" title={email}>
+                        {displayName || '-'}
+                    </span>
+                );
+            }
+        }] : []),
         {
             key: 'actions',
             label: '',
@@ -269,11 +306,38 @@ export function ProcesosClient({ initialData }: ProcesosClientProps) {
         <div className="space-y-6 animate-fadeIn">
             {/* Page Header */}
             <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Procesos</h1>
-                    <p className="text-gray-500 text-sm mt-1">
-                        Historial de todos los procesamientos de tramas
-                    </p>
+                <div className="flex items-center gap-3">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">Procesos</h1>
+                        <p className="text-gray-500 text-sm mt-1">
+                            Historial de todos los procesamientos de tramas
+                        </p>
+                    </div>
+                    {/* Badge/Toggle según rol */}
+                    {!isAdmin ? (
+                        // EJECUTIVO: Badge fijo
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 text-sm font-medium rounded-full">
+                            <User size={14} />
+                            Mis Procesos
+                        </span>
+                    ) : (
+                        // ADMIN: Toggle
+                        <button
+                            onClick={() => setShowOnlyMine(!showOnlyMine)}
+                            className={cn(
+                                "inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full transition-all",
+                                showOnlyMine
+                                    ? "bg-blue-100 text-blue-700"
+                                    : "bg-purple-100 text-purple-700"
+                            )}
+                        >
+                            {showOnlyMine ? (
+                                <><User size={14} /> Solo míos</>
+                            ) : (
+                                <><Users size={14} /> Todos</>
+                            )}
+                        </button>
+                    )}
                 </div>
                 <div className="flex items-center gap-3">
                     <span className="text-sm text-gray-500">

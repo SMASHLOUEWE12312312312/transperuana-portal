@@ -211,6 +211,7 @@ export async function fetchProcesos(params?: {
     estado?: string;
     cliente?: string;
     search?: string;
+    ownerEmail?: string;
 }): Promise<ProcesosResponse> {
     return callAPI<ProcesosResponse>('procesos', {
         limite: params?.limite?.toString() || '100',
@@ -218,7 +219,8 @@ export async function fetchProcesos(params?: {
         tipoSeguro: params?.tipoSeguro || '',
         estado: params?.estado || '',
         cliente: params?.cliente || '',
-        search: params?.search || ''
+        search: params?.search || '',
+        ownerEmail: params?.ownerEmail || 'ALL'
     });
 }
 
