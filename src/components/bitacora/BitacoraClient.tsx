@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { fetchBitacora } from '@/lib/api';
 import { ServerBitacoraResponse } from '@/lib/server-api';
 import { BitacoraCorreo, Compania, TipoSeguro } from '@/lib/types';
-import { formatRelativeTime, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { Mail, Search, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock, XCircle, RefreshCw, AlertTriangle } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 
@@ -23,10 +23,57 @@ const RESULT_ICONS: Record<string, React.ReactNode> = {
     'IGNORADO': <AlertCircle size={16} />
 };
 
+/**
+ * Parsea timestamp de forma segura sin fallback a new Date()
+ * Soporta Date, number (epoch), y string ISO/date
+ */
+function parseTimestampSafe(...values: unknown[]): Date | null {
+    for (const val of values) {
+        if (!val) continue;
+
+        // Si ya es Date
+        if (val instanceof Date && !isNaN(val.getTime())) {
+            return val;
+        }
+
+        // Si es número (epoch)
+        if (typeof val === 'number' && val > 0) {
+            const d = new Date(val);
+            if (!isNaN(d.getTime()) && d.getFullYear() > 2020) {
+                return d;
+            }
+        }
+
+        // Si es string
+        if (typeof val === 'string' && val.trim()) {
+            const parsed = new Date(val);
+            if (!isNaN(parsed.getTime()) && parsed.getFullYear() > 2020) {
+                return parsed;
+            }
+        }
+    }
+    return null; // Sin fecha válida, NO usar new Date()
+}
+
+/**
+ * Formatea fecha en formato fijo dd/MM/yyyy HH:mm
+ */
+function formatDateTime(date: Date | null): string {
+    if (!date) return '—';
+    return date.toLocaleDateString('es-PE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+}
+
 // Transform API response to BitacoraCorreo
 function transformBitacora(b: Record<string, unknown>): BitacoraCorreo {
     return {
-        timestamp: new Date(b.timestamp as string || b.FechaHora as string || new Date()),
+        timestamp: parseTimestampSafe(b.timestamp, b.Timestamp, b.FechaHora, b.fechaCorreo),
         messageId: (b.messageId as string) || (b.MessageId as string) || '',
         threadId: (b.threadId as string) || (b.ThreadId as string) || '',
         subject: (b.subject as string) || (b.Subject as string) || (b.Asunto as string) || '',
@@ -241,7 +288,7 @@ export function BitacoraClient({ initialData }: BitacoraClientProps) {
                                 </div>
 
                                 <div className="text-right shrink-0">
-                                    <p className="text-sm text-gray-500">{formatRelativeTime(item.timestamp)}</p>
+                                    <p className="text-sm text-gray-500">{formatDateTime(item.timestamp)}</p>
                                     <span className={cn(
                                         "text-xs px-2 py-0.5 rounded-full",
                                         RESULT_COLORS[item.processingResult]

@@ -228,7 +228,7 @@ export function generateMockBitacora(count: number = 30): BitacoraCorreo[] {
         });
     }
 
-    return bitacora.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    return bitacora.sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
 }
 
 // Generate dashboard stats

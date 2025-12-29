@@ -68,7 +68,7 @@ export interface ErrorDetalle {
 
 // BITACORA_CORREOS structure
 export interface BitacoraCorreo {
-    timestamp: Date;
+    timestamp: Date | null;
     messageId: string;
     threadId: string;
     subject: string;
