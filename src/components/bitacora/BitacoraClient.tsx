@@ -103,6 +103,7 @@ function transformBitacora(b: Record<string, unknown>): BitacoraCorreo {
         processingResult: ((b.processingResult ?? b.ProcessingResult ?? b.Estado ?? b.estado ?? 'PENDIENTE') as string).toUpperCase() as 'PROCESADO' | 'PENDIENTE' | 'ERROR' | 'IGNORADO',
         idProceso: (b.idProceso as string) || (b.IdProceso as string) || null,
         errorDetail: (b.errorDetail as string) || (b.ErrorResumen as string) || (b.errorResumen as string) || null,
+        conflictos: (b.conflictos as string) || (b.Conflictos as string) || null,
         // Tiempo procesamiento con acentos
         processingTime: Number(b.processingTime ?? b.ProcessingTime ?? b.duracionSeg ?? b.DuracionSeg ?? bAny['DuraciónSeg'] ?? 0)
     };
@@ -346,9 +347,14 @@ export function BitacoraClient({ initialData }: BitacoraClientProps) {
                                         </div>
                                     )}
                                     {/* ERROR: en rojo */}
-                                    {item.processingResult === 'ERROR' && item.errorDetail && (
-                                        <div className="mt-3 p-3 bg-red-50 rounded-lg text-sm text-red-700">
-                                            <strong>Error:</strong> {item.errorDetail}
+                                    {item.processingResult === 'ERROR' && (item.errorDetail || item.conflictos) && (
+                                        <div className="mt-3 p-3 bg-red-50 rounded-lg text-sm text-red-700 space-y-1">
+                                            {item.errorDetail && (
+                                                <p><strong>Error:</strong> {item.errorDetail}</p>
+                                            )}
+                                            {item.conflictos && (
+                                                <p className="text-red-600"><strong>Detalle:</strong> {item.conflictos}</p>
+                                            )}
                                         </div>
                                     )}
                                     {item.idProceso && (

@@ -85,6 +85,7 @@ export interface BitacoraCorreo {
     processingResult: 'PENDIENTE' | 'PROCESADO' | 'ERROR' | 'IGNORADO';
     idProceso: string | null;
     errorDetail: string | null;
+    conflictos: string | null;
     processingTime: number;
 }
 
