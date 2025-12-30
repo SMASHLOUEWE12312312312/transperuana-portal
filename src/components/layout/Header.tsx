@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, LogOut, ChevronDown, ExternalLink, CheckCircle, AlertTriangle, XCircle, Info } from 'lucide-react';
+import { Bell, LogOut, ChevronDown, ExternalLink, CheckCircle, AlertTriangle, XCircle, Info, RefreshCw } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link';
@@ -17,6 +17,8 @@ interface Notification {
     idProceso?: string;
 }
 
+type NotificationState = 'idle' | 'loading' | 'success' | 'error';
+
 const NOTIFICATION_ICONS = {
     success: CheckCircle,
     error: XCircle,
@@ -31,16 +33,21 @@ const NOTIFICATION_COLORS = {
     info: 'text-blue-500 bg-blue-50',
 };
 
+// Polling cada 60 segundos
+const POLLING_INTERVAL = 60000;
+
 export function Header() {
     const { data: session, status } = useSession();
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
+    const [notifState, setNotifState] = useState<NotificationState>('idle');
     const [unreadCount, setUnreadCount] = useState(0);
+    const [lastFetch, setLastFetch] = useState<Date | null>(null);
 
     const notifRef = useRef<HTMLDivElement>(null);
     const userMenuRef = useRef<HTMLDivElement>(null);
+    const retryCountRef = useRef(0);
 
     // Usuario desde la sesión
     const user = session?.user ? {
@@ -50,22 +57,24 @@ export function Header() {
         image: session.user.image
     } : null;
 
-    // Cargar notificaciones
-    const loadNotifications = useCallback(async () => {
+    // Cargar notificaciones con retry
+    const loadNotifications = useCallback(async (isRetry = false) => {
         if (status !== 'authenticated') {
             setNotifications([]);
-            setIsLoadingNotifications(false);
+            setNotifState('idle');
             return;
         }
 
         try {
-            setIsLoadingNotifications(true);
+            if (!isRetry) {
+                setNotifState('loading');
+            }
 
-            // Timeout de 8 segundos para evitar loading infinito
+            // Timeout de 10 segundos
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000);
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-            const response = await fetch('/api/apps-script?action=alertas&limite=10', {
+            const response = await fetch('/api/apps-script?action=alertas&limite=15', {
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
@@ -74,34 +83,48 @@ export function Header() {
                 const data = await response.json();
                 if (data.success && data.alertas) {
                     setNotifications(data.alertas);
+                    setNotifState('success');
+                    setLastFetch(new Date());
+                    retryCountRef.current = 0;
 
                     // Calcular no leídas basado en localStorage
                     const lastSeen = localStorage.getItem('notif_last_seen');
                     const lastSeenTime = lastSeen ? new Date(lastSeen).getTime() : 0;
                     const unread = data.alertas.filter((n: Notification) => {
-                        if (!n.timestamp) return true; // Sin timestamp = nueva
+                        if (!n.timestamp) return true;
                         return new Date(n.timestamp).getTime() > lastSeenTime;
                     }).length;
                     setUnreadCount(unread);
                 } else {
-                    setNotifications([]);
-                    setUnreadCount(0);
+                    throw new Error('Respuesta inválida');
                 }
             } else {
-                setNotifications([]);
-                setUnreadCount(0);
+                throw new Error(`HTTP ${response.status}`);
             }
         } catch (error) {
-            // Error silencioso para timeout o errores de red
             if (error instanceof Error && error.name === 'AbortError') {
-                logger.debug('Notificaciones: timeout alcanzado');
+                logger.debug('Notificaciones: timeout');
             }
-            setNotifications([]);
-            setUnreadCount(0);
-        } finally {
-            setIsLoadingNotifications(false);
+
+            retryCountRef.current++;
+
+            // Solo mostrar error después de 2 intentos fallidos
+            if (retryCountRef.current >= 2) {
+                setNotifState('error');
+            }
+
+            // Mantener notificaciones previas si las hay
+            if (notifications.length === 0) {
+                setNotifState('error');
+            }
         }
-    }, [status]);
+    }, [status, notifications.length]);
+
+    // Retry handler
+    const handleRetry = useCallback(() => {
+        retryCountRef.current = 0;
+        loadNotifications(true);
+    }, [loadNotifications]);
 
     // Marcar como leídas al abrir
     const handleOpenNotifications = () => {
@@ -117,7 +140,7 @@ export function Header() {
     // Cargar y polling
     useEffect(() => {
         loadNotifications();
-        const interval = setInterval(loadNotifications, 120000); // 2 min
+        const interval = setInterval(loadNotifications, POLLING_INTERVAL);
         return () => clearInterval(interval);
     }, [loadNotifications]);
 
@@ -146,6 +169,23 @@ export function Header() {
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, []);
+
+    // Formatear tiempo relativo
+    const formatRelativeTime = (timestamp: string) => {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Ahora';
+        if (diffMins < 60) return `Hace ${diffMins} min`;
+        if (diffHours < 24) return `Hace ${diffHours}h`;
+        if (diffDays < 7) return `Hace ${diffDays}d`;
+
+        return date.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' });
+    };
 
     // Loading state del header
     if (status === 'loading') {
@@ -214,28 +254,57 @@ export function Header() {
                                 className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden animate-slideIn"
                                 role="menu"
                             >
-                                <div className="p-3 border-b border-gray-100 bg-gray-50/50">
-                                    <h3 className="font-semibold text-gray-900">Notificaciones</h3>
-                                    <p className="text-xs text-gray-500">Actividad reciente del sistema</p>
+                                <div className="p-3 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                                    <div>
+                                        <h3 className="font-semibold text-gray-900">Notificaciones</h3>
+                                        <p className="text-xs text-gray-500">Actividad reciente del sistema</p>
+                                    </div>
+                                    {lastFetch && (
+                                        <span className="text-[10px] text-gray-400">
+                                            {formatRelativeTime(lastFetch.toISOString())}
+                                        </span>
+                                    )}
                                 </div>
 
                                 <div className="max-h-80 overflow-y-auto">
-                                    {isLoadingNotifications ? (
+                                    {/* Estado: Cargando */}
+                                    {notifState === 'loading' && notifications.length === 0 && (
                                         <div className="p-8 text-center">
                                             <div className="w-6 h-6 border-2 border-gray-200 border-t-[#CD3529] rounded-full animate-spin mx-auto mb-2" />
                                             <p className="text-sm text-gray-500">Cargando...</p>
                                         </div>
-                                    ) : notifications.length === 0 ? (
+                                    )}
+
+                                    {/* Estado: Error */}
+                                    {notifState === 'error' && notifications.length === 0 && (
+                                        <div className="p-8 text-center">
+                                            <XCircle size={32} className="text-red-300 mx-auto mb-2" />
+                                            <p className="text-sm text-gray-600 font-medium">No se pudo cargar</p>
+                                            <p className="text-xs text-gray-400 mt-1">Verifica tu conexión</p>
+                                            <button
+                                                onClick={handleRetry}
+                                                className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-[#CD3529] hover:text-[#b02d23] transition-colors"
+                                            >
+                                                <RefreshCw size={14} />
+                                                Reintentar
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Estado: Sin notificaciones */}
+                                    {notifState !== 'loading' && notifState !== 'error' && notifications.length === 0 && (
                                         <div className="p-8 text-center">
                                             <Bell size={32} className="text-gray-300 mx-auto mb-2" />
                                             <p className="text-sm text-gray-500 font-medium">No tienes notificaciones</p>
                                             <p className="text-xs text-gray-400 mt-1">Te avisaremos cuando haya actividad</p>
                                         </div>
-                                    ) : (
+                                    )}
+
+                                    {/* Lista de notificaciones */}
+                                    {notifications.length > 0 && (
                                         notifications.map((notif) => {
                                             const IconComponent = NOTIFICATION_ICONS[notif.tipo] || Info;
                                             const colorClass = NOTIFICATION_COLORS[notif.tipo] || NOTIFICATION_COLORS.info;
-                                            // Navegar a proceso si tiene idProceso, sino a lista
                                             const notifHref = notif.idProceso
                                                 ? `/procesos/${notif.idProceso}`
                                                 : '/procesos';
@@ -262,10 +331,7 @@ export function Header() {
                                                             )}
                                                             {notif.timestamp && (
                                                                 <p className="text-xs text-gray-400 mt-1">
-                                                                    {new Date(notif.timestamp).toLocaleString('es-PE', {
-                                                                        day: '2-digit', month: '2-digit', year: 'numeric',
-                                                                        hour: '2-digit', minute: '2-digit'
-                                                                    })}
+                                                                    {formatRelativeTime(notif.timestamp)}
                                                                 </p>
                                                             )}
                                                         </div>

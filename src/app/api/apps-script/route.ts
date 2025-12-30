@@ -86,12 +86,27 @@ export async function GET(request: NextRequest) {
 
         console.log(`[API Proxy] ${action} completado en ${duration}ms`);
 
+        // ========== CACHE DINÁMICO ==========
+        // Endpoints que NO deben cachearse (user-scoped)
+        const USER_SCOPED_ACTIONS = [
+            'alertas', 'notificaciones', 'procesos',
+            'descargas', 'users.getMe', 'users.list',
+            'bitacora', 'errores'
+        ];
+
+        const isUserScoped = USER_SCOPED_ACTIONS.includes(action) ||
+            searchParams.get('ownerEmail') !== null;
+
+        const cacheControl = isUserScoped
+            ? 'private, no-store, must-revalidate'
+            : 'private, s-maxage=30, stale-while-revalidate=60';
+        // ====================================
 
         // Retornar respuesta al cliente
         return NextResponse.json(data, {
             headers: {
-                'Cache-Control': 'private, s-maxage=30, stale-while-revalidate=60',
-                'X-Cache': 'MISS',
+                'Cache-Control': cacheControl,
+                'X-Cache': isUserScoped ? 'BYPASS' : 'MISS',
                 'X-Response-Time': `${duration}ms`
             }
         });
