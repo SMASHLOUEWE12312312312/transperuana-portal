@@ -89,8 +89,12 @@ function transformBitacora(b: Record<string, unknown>): BitacoraCorreo {
         companiaDetectada: ((b.companiaDetectada ?? b.CompaniaDetectada ?? b.compania ?? b.Compania ?? bAny['Compañía'] ?? null) as string | null) as Compania | null,
         // Tipo Seguro
         tipoSeguroDetectado: ((b.tipoSeguroDetectado ?? b.TipoSeguroDetectado ?? b.tipoSeguro ?? b.TipoSeguro ?? null) as string | null) as TipoSeguro | null,
-        // Score/Confianza
-        confidenceScore: Number(b.confidenceScore ?? b.ConfidenceScore ?? b.score ?? b.Score ?? 0),
+        // Score/Confianza - NORMALIZAR: si llega > 1.5 asumimos 0-100
+        confidenceScore: (() => {
+            const raw = Number(b.confidenceScore ?? b.ConfidenceScore ?? b.score ?? b.Score ?? 0);
+            const normalized = raw > 1.5 ? raw / 100 : raw;
+            return Math.min(Math.max(normalized, 0), 1); // clamp 0-1
+        })(),
         // Método Detección con acentos
         detectionMethod: (b.detectionMethod as string) || (b.metodoDeteccion as string) || (b.MetodoDeteccion as string) || (bAny['MétodoDetección'] as string) || '',
         labelRoute: (b.labelRoute as string) || '',
@@ -143,13 +147,14 @@ export function BitacoraClient({ initialData }: BitacoraClientProps) {
         return () => clearInterval(interval);
     }, [refreshData]);
 
-    // Summary stats
+    // Summary stats - IGNORADO no cuenta como error
     const stats = useMemo(() => {
         return {
             total: bitacora.length,
             procesados: bitacora.filter(b => b.processingResult === 'PROCESADO').length,
             pendientes: bitacora.filter(b => b.processingResult === 'PENDIENTE').length,
-            errores: bitacora.filter(b => b.processingResult === 'ERROR').length
+            errores: bitacora.filter(b => b.processingResult === 'ERROR').length,
+            ignorados: bitacora.filter(b => b.processingResult === 'IGNORADO').length
         };
     }, [bitacora]);
 
@@ -334,7 +339,14 @@ export function BitacoraClient({ initialData }: BitacoraClientProps) {
                                             <p className="font-medium">{item.processingTime ? `${item.processingTime}s` : 'N/A'}</p>
                                         </div>
                                     </div>
-                                    {item.errorDetail && (
+                                    {/* IGNORADO: motivo en gris */}
+                                    {item.processingResult === 'IGNORADO' && item.errorDetail && (
+                                        <div className="mt-3 p-3 bg-gray-100 rounded-lg text-sm text-gray-600">
+                                            <strong>Motivo:</strong> {item.errorDetail}
+                                        </div>
+                                    )}
+                                    {/* ERROR: en rojo */}
+                                    {item.processingResult === 'ERROR' && item.errorDetail && (
                                         <div className="mt-3 p-3 bg-red-50 rounded-lg text-sm text-red-700">
                                             <strong>Error:</strong> {item.errorDetail}
                                         </div>
