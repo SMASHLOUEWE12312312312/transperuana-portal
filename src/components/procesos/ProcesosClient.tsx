@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { FilterPanel } from '@/components/ui/FilterPanel';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -11,6 +12,9 @@ import { ServerProcesosResponse } from '@/lib/server-api';
 import { Proceso, Compania, TipoSeguro, EstadoProceso } from '@/lib/types';
 import { formatDateTime, formatDuration, truncate, cn } from '@/lib/utils';
 import { logger } from '@/lib/logger';
+import { useSmartPolling, POLLING_INTERVALS } from '@/hooks/useSmartPolling';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Eye, Download, FileWarning, FileText, RefreshCw, AlertTriangle, User, Users } from 'lucide-react';
 
 // Type for API response proceso
@@ -67,19 +71,11 @@ interface ProcesosClientProps {
 
 export function ProcesosClient({ initialData, userRole, userEmail }: ProcesosClientProps) {
     const router = useRouter();
+    const queryClient = useQueryClient();
     const [filters, setFilters] = useState<Record<string, string>>({});
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [showOnlyMine, setShowOnlyMine] = useState(false); // Toggle para ADMIN
 
     const isAdmin = userRole === 'ADMIN';
-
-    // Initialize with server data
-    const [procesos, setProcesos] = useState<Proceso[]>(() => {
-        if (!initialData?.procesos) return [];
-        return initialData.procesos.map(p => transformProceso(p as APIProceso));
-    });
-    const [totalProcesos, setTotalProcesos] = useState(() => initialData?.total || 0);
 
     // Determinar ownerEmail según rol y toggle
     const getOwnerEmail = useCallback(() => {
@@ -87,37 +83,45 @@ export function ProcesosClient({ initialData, userRole, userEmail }: ProcesosCli
         return showOnlyMine ? userEmail : 'ALL'; // ADMIN: toggle controla
     }, [isAdmin, showOnlyMine, userEmail]);
 
-    // Refresh function
-    const refreshData = useCallback(async () => {
-        setIsRefreshing(true);
-        try {
-            const ownerEmail = getOwnerEmail();
-            const data = await fetchProcesos({ limite: 200, ownerEmail });
-            const transformed = data.procesos.map((p: APIProceso) => transformProceso(p));
-            setProcesos(transformed);
-            setTotalProcesos(data.total);
-            setLastUpdated(new Date());
-            logger.info('[Procesos] Datos actualizados, ownerEmail:', ownerEmail);
-        } catch (error) {
-            console.error('[Procesos] Error al refrescar:', error);
-        } finally {
-            setIsRefreshing(false);
-        }
-    }, [getOwnerEmail]);
+    const ownerEmail = getOwnerEmail();
 
-    // Refrescar cuando cambia el toggle de ADMIN
+    // Polling inteligente
+    const pollingInterval = useSmartPolling(POLLING_INTERVALS.PROCESOS);
+
+    // React Query con queryKey que incluye ownerEmail
+    const {
+        data: procesosRaw,
+        isRefetching,
+        dataUpdatedAt,
+        isError,
+        refetch
+    } = useQuery({
+        queryKey: ['procesos', ownerEmail], // CRÍTICO: separar cache por ownerEmail
+        queryFn: () => fetchProcesos({ limite: 200, ownerEmail }),
+        initialData: initialData ? {
+            procesos: initialData.procesos,
+            total: initialData.total,
+            success: true
+        } : undefined,
+        refetchInterval: pollingInterval,
+        refetchOnMount: 'always',
+        staleTime: 3000,
+    });
+
+    // Invalidar queries cuando cambia el toggle de ADMIN
     useEffect(() => {
         if (isAdmin) {
-            refreshData();
+            queryClient.invalidateQueries({ queryKey: ['procesos'] });
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [showOnlyMine]);
+    }, [showOnlyMine, isAdmin, queryClient]);
 
-    // Auto-refresh every 60 seconds
-    useEffect(() => {
-        const interval = setInterval(refreshData, 60000);
-        return () => clearInterval(interval);
-    }, [refreshData]);
+    // Transformar datos
+    const procesos = useMemo(() => {
+        if (!procesosRaw?.procesos) return [];
+        return procesosRaw.procesos.map(p => transformProceso(p as APIProceso));
+    }, [procesosRaw]);
+
+    const totalProcesos = procesosRaw?.total || 0;
 
     // Get unique clients for filter dropdown
     const clientes = useMemo(() => {
@@ -283,8 +287,8 @@ export function ProcesosClient({ initialData, userRole, userEmail }: ProcesosCli
         }
     ], [isAdmin]);
 
-    // Handle null initialData - error state (AFTER all hooks)
-    if (!initialData) {
+    // Handle error state (AFTER all hooks)
+    if (isError && !procesos.length) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="text-center">
@@ -292,7 +296,7 @@ export function ProcesosClient({ initialData, userRole, userEmail }: ProcesosCli
                     <h2 className="text-lg font-semibold text-gray-900">No se pudieron cargar los procesos</h2>
                     <p className="text-gray-500 mt-2">Verifica la conexión con el sistema</p>
                     <button
-                        onClick={refreshData}
+                        onClick={() => refetch()}
                         className="mt-4 px-4 py-2 bg-[#CD3529] text-white rounded-lg hover:bg-[#b02d23] transition-colors"
                     >
                         Reintentar
@@ -308,9 +312,19 @@ export function ProcesosClient({ initialData, userRole, userEmail }: ProcesosCli
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Procesos</h1>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-2xl font-bold text-gray-900">Procesos</h1>
+                            {isRefetching && (
+                                <RefreshCw size={16} className="animate-spin text-gray-400" />
+                            )}
+                        </div>
                         <p className="text-gray-500 text-sm mt-1">
                             Historial de todos los procesamientos de tramas
+                            {dataUpdatedAt && (
+                                <span className="ml-2 text-gray-400">
+                                    · Actualizado {formatDistanceToNow(dataUpdatedAt, { addSuffix: true, locale: es })}
+                                </span>
+                            )}
                         </p>
                     </div>
                     {/* Badge/Toggle según rol */}
@@ -343,19 +357,16 @@ export function ProcesosClient({ initialData, userRole, userEmail }: ProcesosCli
                     <span className="text-sm text-gray-500">
                         {filteredData.length} de {totalProcesos} procesos
                     </span>
-                    <span className="text-xs text-gray-400">
-                        {lastUpdated.toLocaleTimeString()}
-                    </span>
                     <button
-                        onClick={refreshData}
-                        disabled={isRefreshing}
+                        onClick={() => refetch()}
+                        disabled={isRefetching}
                         className={cn(
                             "flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all",
                             "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50",
-                            isRefreshing && "opacity-50 cursor-not-allowed"
+                            isRefetching && "opacity-50 cursor-not-allowed"
                         )}
                     >
-                        <RefreshCw size={16} className={cn(isRefreshing && "animate-spin")} />
+                        <RefreshCw size={16} className={cn(isRefetching && "animate-spin")} />
                         Actualizar
                     </button>
                 </div>

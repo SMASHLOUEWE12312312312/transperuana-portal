@@ -1,10 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { fetchConfig } from '@/lib/api';
 import { ServerConfigResponse } from '@/lib/server-api';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/logger';
+import { useSmartPolling, POLLING_INTERVALS } from '@/hooks/useSmartPolling';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Users, FileText, Settings, Shield, Plus, Pencil, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 
 interface ConfigData {
@@ -19,43 +23,38 @@ interface ConfiguracionClientProps {
 
 export function ConfiguracionClient({ initialData }: ConfiguracionClientProps) {
     const [activeTab, setActiveTab] = useState<'usuarios' | 'plantillas' | 'sistema'>('usuarios');
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-    // Initialize with server data
-    const [config, setConfig] = useState<ConfigData>(() => {
-        if (!initialData) return { clientes: [], companias: [], plantillas: {} };
-        return {
-            clientes: initialData.clientes || [],
-            companias: initialData.companias || [],
-            plantillas: initialData.plantillas || {}
-        };
+    // Polling inteligente (60s para config - menos crítico)
+    const pollingInterval = useSmartPolling(POLLING_INTERVALS.CONFIG);
+
+    // React Query
+    const {
+        data: configRaw,
+        isRefetching,
+        dataUpdatedAt,
+        isError,
+        refetch
+    } = useQuery({
+        queryKey: ['config'],
+        queryFn: fetchConfig,
+        initialData: initialData ? {
+            ...initialData,
+            success: true
+        } : undefined,
+        refetchInterval: pollingInterval,
+        refetchOnMount: 'always',
+        staleTime: 30000, // 30 segundos - menos activo
     });
 
-    // Refresh function
-    const refreshData = useCallback(async () => {
-        setIsRefreshing(true);
-        try {
-            const data = await fetchConfig();
-            setConfig({
-                clientes: data.clientes,
-                companias: data.companias,
-                plantillas: data.plantillas
-            });
-            setLastUpdated(new Date());
-            logger.info('[Configuración] Datos actualizados');
-        } catch (error) {
-            console.error('[Configuración] Error al refrescar:', error);
-        } finally {
-            setIsRefreshing(false);
-        }
-    }, []);
-
-    // Auto-refresh every 60 seconds
-    useEffect(() => {
-        const interval = setInterval(refreshData, 60000);
-        return () => clearInterval(interval);
-    }, [refreshData]);
+    // Transform data
+    const config = useMemo<ConfigData>(() => {
+        if (!configRaw) return { clientes: [], companias: [], plantillas: {} };
+        return {
+            clientes: configRaw.clientes || [],
+            companias: configRaw.companias || [],
+            plantillas: configRaw.plantillas || {}
+        };
+    }, [configRaw]);
 
     const tabs = [
         { id: 'usuarios' as const, label: 'Clientes', icon: <Users size={18} /> },
@@ -63,8 +62,8 @@ export function ConfiguracionClient({ initialData }: ConfiguracionClientProps) {
         { id: 'sistema' as const, label: 'Sistema', icon: <Settings size={18} /> }
     ];
 
-    // Handle null initialData - error state
-    if (!initialData) {
+    // Handle error state
+    if (isError && !config.clientes.length) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="text-center">
@@ -72,7 +71,7 @@ export function ConfiguracionClient({ initialData }: ConfiguracionClientProps) {
                     <h2 className="text-lg font-semibold text-gray-900">No se pudo cargar la configuración</h2>
                     <p className="text-gray-500 mt-2">Verifica la conexión con el sistema</p>
                     <button
-                        onClick={refreshData}
+                        onClick={() => refetch()}
                         className="mt-4 px-4 py-2 bg-[#CD3529] text-white rounded-lg hover:bg-[#b02d23] transition-colors"
                     >
                         Reintentar
@@ -91,24 +90,33 @@ export function ConfiguracionClient({ initialData }: ConfiguracionClientProps) {
                         <Shield size={20} className="text-gray-600" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Configuración</h1>
-                        <p className="text-gray-500 text-sm">Panel de administración del sistema</p>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-2xl font-bold text-gray-900">Configuración</h1>
+                            {isRefetching && (
+                                <RefreshCw size={16} className="animate-spin text-gray-400" />
+                            )}
+                        </div>
+                        <p className="text-gray-500 text-sm">
+                            Panel de administración del sistema
+                            {dataUpdatedAt && (
+                                <span className="ml-2 text-gray-400">
+                                    · Actualizado {formatDistanceToNow(dataUpdatedAt, { addSuffix: true, locale: es })}
+                                </span>
+                            )}
+                        </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <span className="text-xs text-gray-400">
-                        {lastUpdated.toLocaleTimeString()}
-                    </span>
                     <button
-                        onClick={refreshData}
-                        disabled={isRefreshing}
+                        onClick={() => refetch()}
+                        disabled={isRefetching}
                         className={cn(
                             "flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all",
                             "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50",
-                            isRefreshing && "opacity-50 cursor-not-allowed"
+                            isRefetching && "opacity-50 cursor-not-allowed"
                         )}
                     >
-                        <RefreshCw size={16} className={cn(isRefreshing && "animate-spin")} />
+                        <RefreshCw size={16} className={cn(isRefetching && "animate-spin")} />
                         Actualizar
                     </button>
                 </div>

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { fetchErrores } from '@/lib/api';
@@ -9,6 +10,9 @@ import { ServerErroresResponse } from '@/lib/server-api';
 import { logger } from '@/lib/logger';
 import { ErrorDetalle, TipoError } from '@/lib/types';
 import { formatDateTime, truncate, cn } from '@/lib/utils';
+import { useSmartPolling, POLLING_INTERVALS } from '@/hooks/useSmartPolling';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { AlertTriangle, Search, ExternalLink, RefreshCw } from 'lucide-react';
 
 // Type for API error
@@ -42,36 +46,35 @@ interface ErroresClientProps {
 export function ErroresClient({ initialData }: ErroresClientProps) {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState<string>('');
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-    // Initialize with server data
-    const [errores, setErrores] = useState<ErrorDetalle[]>(() => {
-        if (!initialData?.errores) return [];
-        return initialData.errores.map(e => transformError(e as APIError));
+    // Polling inteligente (30s para errores)
+    const pollingInterval = useSmartPolling(POLLING_INTERVALS.ERRORES);
+
+    // React Query
+    const {
+        data: erroresRaw,
+        isRefetching,
+        dataUpdatedAt,
+        isError,
+        refetch
+    } = useQuery({
+        queryKey: ['errores'],
+        queryFn: () => fetchErrores({ limite: 500 }),
+        initialData: initialData ? {
+            errores: initialData.errores,
+            total: initialData.total,
+            success: true
+        } : undefined,
+        refetchInterval: pollingInterval,
+        refetchOnMount: 'always',
+        staleTime: 10000, // 10 segundos
     });
 
-    // Refresh function
-    const refreshData = useCallback(async () => {
-        setIsRefreshing(true);
-        try {
-            const data = await fetchErrores({ limite: 500 });
-            const transformed = data.errores.map((e: APIError) => transformError(e));
-            setErrores(transformed);
-            setLastUpdated(new Date());
-            logger.info('[Errores] Datos actualizados');
-        } catch (error) {
-            console.error('[Errores] Error al refrescar:', error);
-        } finally {
-            setIsRefreshing(false);
-        }
-    }, []);
-
-    // Auto-refresh every 60 seconds
-    useEffect(() => {
-        const interval = setInterval(refreshData, 60000);
-        return () => clearInterval(interval);
-    }, [refreshData]);
+    // Transformar datos
+    const errores = useMemo(() => {
+        if (!erroresRaw?.errores) return [];
+        return erroresRaw.errores.map(e => transformError(e as APIError));
+    }, [erroresRaw]);
 
     // Group errors by type for summary
     const errorSummary = useMemo(() => {
@@ -99,8 +102,8 @@ export function ErroresClient({ initialData }: ErroresClientProps) {
         });
     }, [errores, searchTerm, filterType]);
 
-    // Handle null initialData - error state
-    if (!initialData) {
+    // Handle error state
+    if (isError && !errores.length) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="text-center">
@@ -108,7 +111,7 @@ export function ErroresClient({ initialData }: ErroresClientProps) {
                     <h2 className="text-lg font-semibold text-gray-900">No se pudieron cargar los errores</h2>
                     <p className="text-gray-500 mt-2">Verifica la conexión con el sistema</p>
                     <button
-                        onClick={refreshData}
+                        onClick={() => refetch()}
                         className="mt-4 px-4 py-2 bg-[#CD3529] text-white rounded-lg hover:bg-[#b02d23] transition-colors"
                     >
                         Reintentar
@@ -193,28 +196,35 @@ export function ErroresClient({ initialData }: ErroresClientProps) {
             {/* Page Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Errores</h1>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-2xl font-bold text-gray-900">Errores</h1>
+                        {isRefetching && (
+                            <RefreshCw size={16} className="animate-spin text-gray-400" />
+                        )}
+                    </div>
                     <p className="text-gray-500 text-sm mt-1">
                         Detalle de todos los errores detectados en los procesamientos
+                        {dataUpdatedAt && (
+                            <span className="ml-2 text-gray-400">
+                                · Actualizado {formatDistanceToNow(dataUpdatedAt, { addSuffix: true, locale: es })}
+                            </span>
+                        )}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
                     <span className="text-sm text-gray-500">
                         {filteredData.length} errores
                     </span>
-                    <span className="text-xs text-gray-400">
-                        {lastUpdated.toLocaleTimeString()}
-                    </span>
                     <button
-                        onClick={refreshData}
-                        disabled={isRefreshing}
+                        onClick={() => refetch()}
+                        disabled={isRefetching}
                         className={cn(
                             "flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all",
                             "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50",
-                            isRefreshing && "opacity-50 cursor-not-allowed"
+                            isRefetching && "opacity-50 cursor-not-allowed"
                         )}
                     >
-                        <RefreshCw size={16} className={cn(isRefreshing && "animate-spin")} />
+                        <RefreshCw size={16} className={cn(isRefetching && "animate-spin")} />
                         Actualizar
                     </button>
                 </div>

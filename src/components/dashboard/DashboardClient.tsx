@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { useQuery } from '@tanstack/react-query';
 import { Activity, FileText, CheckCircle, Clock, AlertTriangle, X, RefreshCw } from 'lucide-react';
 import { KPICard } from '@/components/ui/KPICard';
 import { Timeline } from '@/components/ui/Timeline';
@@ -11,6 +12,9 @@ import { formatCompanyName, cn } from '@/lib/utils';
 import { ActivityItem, Compania, TipoError, EstadoProceso } from '@/lib/types';
 import { ServerDashboardResponse } from '@/lib/server-api';
 import { logger } from '@/lib/logger';
+import { useSmartPolling, POLLING_INTERVALS } from '@/hooks/useSmartPolling';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 type AlertType = 'warning' | 'error' | 'success' | 'info';
 
@@ -63,48 +67,68 @@ interface DashboardClientProps {
 
 export function DashboardClient({ initialData }: DashboardClientProps) {
     const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([]);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-    // Inicializar con datos del servidor (sin mock!)
-    const [kpis, setKpis] = useState(() => initialData?.kpis ? {
-        procesosHoy: initialData.kpis.procesosHoy,
-        procesosTendencia: initialData.kpis.procesosTendencia,
-        registrosProcesados: initialData.kpis.registrosProcesados,
-        registrosTendencia: initialData.kpis.registrosTendencia,
-        tasaExito: initialData.kpis.tasaExito,
-        tasaExitoTendencia: initialData.kpis.tasaExitoTendencia,
-        tiempoPromedio: initialData.kpis.tiempoPromedio,
-        tiempoPromedioTendencia: initialData.kpis.tiempoPromedioTendencia
-    } : null);
+    // Polling inteligente
+    const pollingInterval = useSmartPolling(POLLING_INTERVALS.DASHBOARD);
 
-    const [chartData, setChartData] = useState(() =>
-        initialData?.chartData?.map(d => ({
+    // React Query
+    const {
+        data: dashboardData,
+        isRefetching,
+        dataUpdatedAt,
+        isError,
+        refetch
+    } = useQuery({
+        queryKey: ['dashboard'],
+        queryFn: fetchDashboard,
+        initialData: initialData ? {
+            ...initialData,
+            success: true
+        } : undefined,
+        refetchInterval: pollingInterval,
+        refetchOnMount: 'always',
+        staleTime: 5000,
+    });
+
+    // Transform data
+    const kpis = useMemo(() => dashboardData?.kpis ? {
+        procesosHoy: dashboardData.kpis.procesosHoy,
+        procesosTendencia: dashboardData.kpis.procesosTendencia,
+        registrosProcesados: dashboardData.kpis.registrosProcesados,
+        registrosTendencia: dashboardData.kpis.registrosTendencia,
+        tasaExito: dashboardData.kpis.tasaExito,
+        tasaExitoTendencia: dashboardData.kpis.tasaExitoTendencia,
+        tiempoPromedio: dashboardData.kpis.tiempoPromedio,
+        tiempoPromedioTendencia: dashboardData.kpis.tiempoPromedioTendencia
+    } : null, [dashboardData]);
+
+    const chartData = useMemo(() =>
+        dashboardData?.chartData?.map(d => ({
             fecha: d.fecha,
             procesos: d.procesos,
             exitosos: d.registros - d.errores,
             errores: d.errores
         })) || []
-    );
+        , [dashboardData]);
 
-    const [companiaDistribution, setCompaniaDistribution] = useState(() =>
-        initialData?.companiaDistribution?.map(c => ({
+    const companiaDistribution = useMemo(() =>
+        dashboardData?.companiaDistribution?.map(c => ({
             compania: c.compania as Compania,
             cantidad: c.cantidad,
             porcentaje: parseFloat(c.porcentaje)
         })) || []
-    );
+        , [dashboardData]);
 
-    const [errorDistribution, setErrorDistribution] = useState(() =>
-        initialData?.errorDistribution?.map(e => ({
+    const errorDistribution = useMemo(() =>
+        dashboardData?.errorDistribution?.map(e => ({
             tipoError: e.tipoError as TipoError,
             cantidad: e.cantidad,
             porcentaje: 0
         })) || []
-    );
+        , [dashboardData]);
 
-    const [actividadReciente, setActividadReciente] = useState<ActivityItem[]>(() =>
-        initialData?.actividadReciente?.map(a => ({
+    const actividadReciente = useMemo<ActivityItem[]>(() =>
+        dashboardData?.actividadReciente?.map(a => ({
             id: a.id,
             tipo: a.tipo as 'proceso' | 'correo' | 'error',
             titulo: a.titulo,
@@ -113,94 +137,37 @@ export function DashboardClient({ initialData }: DashboardClientProps) {
             timestamp: new Date(a.timestamp),
             link: `/procesos/${a.id}`
         })) || []
-    );
-
-    // Función para refrescar datos
-    const refreshData = useCallback(async () => {
-        setIsRefreshing(true);
-        try {
-            const data = await fetchDashboard();
-
-            setKpis({
-                procesosHoy: data.kpis.procesosHoy,
-                procesosTendencia: data.kpis.procesosTendencia,
-                registrosProcesados: data.kpis.registrosProcesados,
-                registrosTendencia: data.kpis.registrosTendencia,
-                tasaExito: data.kpis.tasaExito,
-                tasaExitoTendencia: data.kpis.tasaExitoTendencia,
-                tiempoPromedio: data.kpis.tiempoPromedio,
-                tiempoPromedioTendencia: data.kpis.tiempoPromedioTendencia
-            });
-
-            setChartData(data.chartData.map(d => ({
-                fecha: d.fecha,
-                procesos: d.procesos,
-                exitosos: d.registros - d.errores,
-                errores: d.errores
-            })));
-
-            setCompaniaDistribution(data.companiaDistribution.map(c => ({
-                compania: c.compania as Compania,
-                cantidad: c.cantidad,
-                porcentaje: parseFloat(c.porcentaje)
-            })));
-
-            setErrorDistribution(data.errorDistribution.map(e => ({
-                tipoError: e.tipoError as TipoError,
-                cantidad: e.cantidad,
-                porcentaje: 0
-            })));
-
-            setActividadReciente(data.actividadReciente.map(a => ({
-                id: a.id,
-                tipo: a.tipo as 'proceso' | 'correo' | 'error',
-                titulo: a.titulo,
-                descripcion: a.descripcion,
-                estado: (a.estado || 'COMPLETADO') as EstadoProceso,
-                timestamp: new Date(a.timestamp),
-                link: `/procesos/${a.id}`
-            })));
-
-            setLastUpdated(new Date());
-            logger.info('[Dashboard] Datos actualizados');
-        } catch (error) {
-            console.error('[Dashboard] Error al refrescar:', error);
-        } finally {
-            setIsRefreshing(false);
-        }
-    }, []);
-
-    // Auto-refresh cada 60 segundos
-    useEffect(() => {
-        const interval = setInterval(refreshData, 60000);
-        return () => clearInterval(interval);
-    }, [refreshData]);
+        , [dashboardData]);
 
     // Alertas del sistema basadas en datos reales
-    const alerts: Alert[] = [];
+    const alerts: Alert[] = useMemo(() => {
+        const result: Alert[] = [];
 
-    if (errorDistribution.length > 0) {
-        const totalErrores = errorDistribution.reduce((sum, e) => sum + e.cantidad, 0);
-        if (totalErrores > 0) {
-            alerts.push({
-                id: 'errores',
-                tipo: 'warning' as const,
-                titulo: `${totalErrores} errores en procesos recientes`,
-                descripcion: 'Hay procesos que requieren revisión manual',
-                dismissible: true
+        if (errorDistribution.length > 0) {
+            const totalErrores = errorDistribution.reduce((sum, e) => sum + e.cantidad, 0);
+            if (totalErrores > 0) {
+                result.push({
+                    id: 'errores',
+                    tipo: 'warning' as const,
+                    titulo: `${totalErrores} errores en procesos recientes`,
+                    descripcion: 'Hay procesos que requieren revisión manual',
+                    dismissible: true
+                });
+            }
+        }
+
+        if (kpis && kpis.procesosHoy > 0) {
+            result.push({
+                id: 'sistema',
+                tipo: 'success' as const,
+                titulo: 'Sistema operativo',
+                descripcion: `${kpis.procesosHoy} proceso(s) ejecutado(s) hoy`,
+                dismissible: false
             });
         }
-    }
 
-    if (kpis && kpis.procesosHoy > 0) {
-        alerts.push({
-            id: 'sistema',
-            tipo: 'success' as const,
-            titulo: 'Sistema operativo',
-            descripcion: `${kpis.procesosHoy} proceso(s) ejecutado(s) hoy`,
-            dismissible: false
-        });
-    }
+        return result;
+    }, [errorDistribution, kpis]);
 
     const visibleAlerts = alerts.filter(a => !dismissedAlerts.includes(a.id));
 
@@ -209,7 +176,7 @@ export function DashboardClient({ initialData }: DashboardClientProps) {
     };
 
     // Si no hay datos iniciales, mostrar mensaje de error
-    if (!kpis) {
+    if (isError && !kpis) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="text-center">
@@ -217,11 +184,22 @@ export function DashboardClient({ initialData }: DashboardClientProps) {
                     <h2 className="text-lg font-semibold text-gray-900">No se pudieron cargar los datos</h2>
                     <p className="text-gray-500 mt-2">Verifica la conexión con el sistema</p>
                     <button
-                        onClick={refreshData}
+                        onClick={() => refetch()}
                         className="mt-4 px-4 py-2 bg-[#CD3529] text-white rounded-lg hover:bg-[#b02d23] transition-colors"
                     >
                         Reintentar
                     </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (!kpis) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="text-center">
+                    <RefreshCw className="w-12 h-12 text-gray-300 mx-auto mb-4 animate-spin" />
+                    <p className="text-gray-500">Cargando dashboard...</p>
                 </div>
             </div>
         );
@@ -232,25 +210,32 @@ export function DashboardClient({ initialData }: DashboardClientProps) {
             {/* Page Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+                        {isRefetching && (
+                            <RefreshCw size={16} className="animate-spin text-gray-400" />
+                        )}
+                    </div>
                     <p className="text-gray-500 text-sm mt-1">
                         Resumen del sistema de procesamiento de tramas
+                        {dataUpdatedAt && (
+                            <span className="ml-2 text-gray-400">
+                                · Actualizado {formatDistanceToNow(dataUpdatedAt, { addSuffix: true, locale: es })}
+                            </span>
+                        )}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <span className="text-xs text-gray-400">
-                        {lastUpdated.toLocaleTimeString()}
-                    </span>
                     <button
-                        onClick={refreshData}
-                        disabled={isRefreshing}
+                        onClick={() => refetch()}
+                        disabled={isRefetching}
                         className={cn(
                             "flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all",
                             "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50",
-                            isRefreshing && "opacity-50 cursor-not-allowed"
+                            isRefetching && "opacity-50 cursor-not-allowed"
                         )}
                     >
-                        <RefreshCw size={16} className={cn(isRefreshing && "animate-spin")} />
+                        <RefreshCw size={16} className={cn(isRefetching && "animate-spin")} />
                         Actualizar
                     </button>
                 </div>

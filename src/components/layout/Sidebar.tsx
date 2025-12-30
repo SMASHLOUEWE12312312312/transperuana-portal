@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import {
     LayoutDashboard,
     FileText,
@@ -15,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { fetchDashboard, fetchProcesos, fetchBitacora, fetchErrores, fetchDescargas, fetchConfig } from '@/lib/api';
 
 interface NavItem {
     href: string;
@@ -32,15 +35,38 @@ const navItems: NavItem[] = [
     { href: '/configuracion', label: 'Configuración', icon: <Settings size={20} />, adminOnly: true },
 ];
 
+// Mapa de prefetch: queryKey y fetcher para cada ruta
+const PREFETCH_MAP: Record<string, { queryKey: string[]; fetcher: () => Promise<unknown> }> = {
+    '/': { queryKey: ['dashboard'], fetcher: fetchDashboard },
+    '/procesos': { queryKey: ['procesos', 'ALL'], fetcher: () => fetchProcesos({ limite: 200 }) },
+    '/bitacora': { queryKey: ['bitacora'], fetcher: () => fetchBitacora({ limite: 100 }) },
+    '/errores': { queryKey: ['errores'], fetcher: () => fetchErrores({ limite: 500 }) },
+    '/descargas': { queryKey: ['descargas'], fetcher: fetchDescargas },
+    '/configuracion': { queryKey: ['config'], fetcher: fetchConfig },
+};
+
 export function Sidebar() {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
     const { data: session } = useSession();
+    const queryClient = useQueryClient();
 
     // Verificar rol de admin desde la sesión real
     const isAdmin = (session?.user as { role?: string })?.role === 'ADMIN';
 
     const visibleItems = navItems.filter(item => !item.adminOnly || isAdmin);
+
+    // Prefetch al hover para navegación instantánea
+    const handlePrefetch = useCallback((href: string) => {
+        const config = PREFETCH_MAP[href];
+        if (!config) return;
+
+        queryClient.prefetchQuery({
+            queryKey: config.queryKey,
+            queryFn: config.fetcher,
+            staleTime: 30000, // 30 segundos de cache en prefetch
+        });
+    }, [queryClient]);
 
     return (
         <aside
@@ -61,6 +87,7 @@ export function Sidebar() {
                                 key={item.href}
                                 href={item.href}
                                 prefetch={true}
+                                onMouseEnter={() => handlePrefetch(item.href)}
                                 className={cn(
                                     "nav-item",
                                     isActive && "active",

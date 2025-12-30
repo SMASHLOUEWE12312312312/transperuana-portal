@@ -1,12 +1,16 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { fetchBitacora } from '@/lib/api';
 import { ServerBitacoraResponse } from '@/lib/server-api';
 import { BitacoraCorreo, Compania, TipoSeguro } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/logger';
+import { useSmartPolling, POLLING_INTERVALS } from '@/hooks/useSmartPolling';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Mail, Search, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Clock, XCircle, RefreshCw, AlertTriangle } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 
@@ -117,36 +121,35 @@ export function BitacoraClient({ initialData }: BitacoraClientProps) {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterResult, setFilterResult] = useState<string>('');
     const [expandedId, setExpandedId] = useState<string | null>(null);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-    // Initialize with server data
-    const [bitacora, setBitacora] = useState<BitacoraCorreo[]>(() => {
-        if (!initialData?.bitacora) return [];
-        return initialData.bitacora.map(b => transformBitacora(b));
+    // Polling inteligente (pausa cuando tab hidden)
+    const pollingInterval = useSmartPolling(POLLING_INTERVALS.BITACORA);
+
+    // React Query para fetching con cache inteligente
+    const {
+        data: bitacoraRaw,
+        isRefetching,
+        dataUpdatedAt,
+        isError,
+        refetch
+    } = useQuery({
+        queryKey: ['bitacora'],
+        queryFn: () => fetchBitacora({ limite: 100 }),
+        initialData: initialData ? {
+            bitacora: initialData.bitacora,
+            total: initialData.total,
+            success: true
+        } : undefined,
+        refetchInterval: pollingInterval,
+        refetchOnMount: 'always',
+        staleTime: 3000, // 3 segundos
     });
 
-    // Refresh function
-    const refreshData = useCallback(async () => {
-        setIsRefreshing(true);
-        try {
-            const data = await fetchBitacora({ limite: 100 });
-            const transformed = data.bitacora.map((b: Record<string, unknown>) => transformBitacora(b));
-            setBitacora(transformed);
-            setLastUpdated(new Date());
-            logger.info('[Bitácora] Datos actualizados');
-        } catch (error) {
-            console.error('[Bitácora] Error al refrescar:', error);
-        } finally {
-            setIsRefreshing(false);
-        }
-    }, []);
-
-    // Auto-refresh every 60 seconds
-    useEffect(() => {
-        const interval = setInterval(refreshData, 60000);
-        return () => clearInterval(interval);
-    }, [refreshData]);
+    // Transformar datos
+    const bitacora = useMemo(() => {
+        if (!bitacoraRaw?.bitacora) return [];
+        return bitacoraRaw.bitacora.map(b => transformBitacora(b as Record<string, unknown>));
+    }, [bitacoraRaw]);
 
     // Summary stats - IGNORADO no cuenta como error
     const stats = useMemo(() => {
@@ -174,8 +177,8 @@ export function BitacoraClient({ initialData }: BitacoraClientProps) {
         });
     }, [bitacora, searchTerm, filterResult]);
 
-    // Handle null initialData - error state
-    if (!initialData) {
+    // Handle error state
+    if (isError && !bitacora.length) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="text-center">
@@ -183,7 +186,7 @@ export function BitacoraClient({ initialData }: BitacoraClientProps) {
                     <h2 className="text-lg font-semibold text-gray-900">No se pudo cargar la bitácora</h2>
                     <p className="text-gray-500 mt-2">Verifica la conexión con el sistema</p>
                     <button
-                        onClick={refreshData}
+                        onClick={() => refetch()}
                         className="mt-4 px-4 py-2 bg-[#CD3529] text-white rounded-lg hover:bg-[#b02d23] transition-colors"
                     >
                         Reintentar
@@ -198,25 +201,32 @@ export function BitacoraClient({ initialData }: BitacoraClientProps) {
             {/* Page Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Bitácora de Correos</h1>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-2xl font-bold text-gray-900">Bitácora de Correos</h1>
+                        {isRefetching && (
+                            <RefreshCw size={16} className="animate-spin text-gray-400" />
+                        )}
+                    </div>
                     <p className="text-gray-500 text-sm mt-1">
                         Historial de correos recibidos y procesados
+                        {dataUpdatedAt && (
+                            <span className="ml-2 text-gray-400">
+                                · Actualizado {formatDistanceToNow(dataUpdatedAt, { addSuffix: true, locale: es })}
+                            </span>
+                        )}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <span className="text-xs text-gray-400">
-                        {lastUpdated.toLocaleTimeString()}
-                    </span>
                     <button
-                        onClick={refreshData}
-                        disabled={isRefreshing}
+                        onClick={() => refetch()}
+                        disabled={isRefetching}
                         className={cn(
                             "flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all",
                             "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50",
-                            isRefreshing && "opacity-50 cursor-not-allowed"
+                            isRefetching && "opacity-50 cursor-not-allowed"
                         )}
                     >
-                        <RefreshCw size={16} className={cn(isRefreshing && "animate-spin")} />
+                        <RefreshCw size={16} className={cn(isRefetching && "animate-spin")} />
                         Actualizar
                     </button>
                 </div>

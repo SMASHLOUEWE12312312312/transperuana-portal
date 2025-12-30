@@ -38,16 +38,19 @@ async function serverFetch<T>(
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-        // userScoped: NO cache (datos varían por usuario)
-        // normal: cache con ISR (60s revalidate)
         const userScoped = Boolean(options.userScoped);
+
+        // NUEVO: Endpoints realtime NUNCA cachean para garantizar datos frescos
+        const REALTIME_ACTIONS = ['dashboard', 'procesos', 'bitacora', 'errores', 'descargas', 'alertas', 'proceso'];
+        const isRealtime = REALTIME_ACTIONS.includes(action);
+        const shouldCache = !isRealtime && !userScoped;
 
         const response = await fetch(url.toString(), {
             method: 'GET',
             redirect: 'follow',
             signal: controller.signal,
-            cache: userScoped ? 'no-store' : 'force-cache',
-            ...(userScoped ? {} : { next: { revalidate: 60, tags: [action] } })
+            cache: shouldCache ? 'force-cache' : 'no-store',
+            ...(shouldCache ? { next: { revalidate: 300, tags: [action] } } : {})
         });
 
         clearTimeout(timeoutId);
@@ -59,7 +62,7 @@ async function serverFetch<T>(
         const data = await response.json();
         const duration = Date.now() - startTime;
 
-        logger.info(`[Server API] ${action} completado en ${duration}ms`);
+        logger.info(`[Server API] ${action} completado en ${duration}ms (cache: ${shouldCache ? 'enabled' : 'disabled'})`);
 
         return data as T;
     } catch (error) {

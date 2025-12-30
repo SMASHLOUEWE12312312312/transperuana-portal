@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { fetchDescargas } from '@/lib/api';
@@ -8,6 +9,9 @@ import { ServerDescargasResponse } from '@/lib/server-api';
 import { DescargaItem, Compania, TipoSeguro } from '@/lib/types';
 import { logger } from '@/lib/logger';
 import { formatDateTime, formatFileSize, cn } from '@/lib/utils';
+import { useSmartPolling, POLLING_INTERVALS } from '@/hooks/useSmartPolling';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Download, FileSpreadsheet, FileWarning, Search, RefreshCw, AlertTriangle } from 'lucide-react';
 
 // API descarga type
@@ -44,36 +48,35 @@ interface DescargasClientProps {
 
 export function DescargasClient({ initialData }: DescargasClientProps) {
     const [filters, setFilters] = useState<Record<string, string>>({});
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-    // Initialize with server data
-    const [descargas, setDescargas] = useState<DescargaItem[]>(() => {
-        if (!initialData?.descargas) return [];
-        return initialData.descargas.map(d => transformDescarga(d as APIDescarga));
+    // Polling inteligente (30s para descargas)
+    const pollingInterval = useSmartPolling(POLLING_INTERVALS.DESCARGAS);
+
+    // React Query
+    const {
+        data: descargasRaw,
+        isRefetching,
+        dataUpdatedAt,
+        isError,
+        refetch
+    } = useQuery({
+        queryKey: ['descargas'],
+        queryFn: () => fetchDescargas(),
+        initialData: initialData ? {
+            descargas: initialData.descargas,
+            total: initialData.total,
+            success: true
+        } : undefined,
+        refetchInterval: pollingInterval,
+        refetchOnMount: 'always',
+        staleTime: 10000, // 10 segundos
     });
 
-    // Refresh function
-    const refreshData = useCallback(async () => {
-        setIsRefreshing(true);
-        try {
-            const data = await fetchDescargas();
-            const transformed = data.descargas.map((d: APIDescarga) => transformDescarga(d));
-            setDescargas(transformed);
-            setLastUpdated(new Date());
-            logger.info('[Descargas] Datos actualizados');
-        } catch (error) {
-            console.error('[Descargas] Error al refrescar:', error);
-        } finally {
-            setIsRefreshing(false);
-        }
-    }, []);
-
-    // Auto-refresh every 60 seconds
-    useEffect(() => {
-        const interval = setInterval(refreshData, 60000);
-        return () => clearInterval(interval);
-    }, [refreshData]);
+    // Transformar datos
+    const descargas = useMemo(() => {
+        if (!descargasRaw?.descargas) return [];
+        return descargasRaw.descargas.map(d => transformDescarga(d as APIDescarga));
+    }, [descargasRaw]);
 
     // Summary counts
     const counts = useMemo(() => ({
@@ -97,8 +100,8 @@ export function DescargasClient({ initialData }: DescargasClientProps) {
         });
     }, [descargas, filters]);
 
-    // Handle null initialData - error state
-    if (!initialData) {
+    // Handle error state
+    if (isError && !descargas.length) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="text-center">
@@ -106,7 +109,7 @@ export function DescargasClient({ initialData }: DescargasClientProps) {
                     <h2 className="text-lg font-semibold text-gray-900">No se pudieron cargar las descargas</h2>
                     <p className="text-gray-500 mt-2">Verifica la conexión con el sistema</p>
                     <button
-                        onClick={refreshData}
+                        onClick={() => refetch()}
                         className="mt-4 px-4 py-2 bg-[#CD3529] text-white rounded-lg hover:bg-[#b02d23] transition-colors"
                     >
                         Reintentar
@@ -194,28 +197,35 @@ export function DescargasClient({ initialData }: DescargasClientProps) {
             {/* Page Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Descargas</h1>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-2xl font-bold text-gray-900">Descargas</h1>
+                        {isRefetching && (
+                            <RefreshCw size={16} className="animate-spin text-gray-400" />
+                        )}
+                    </div>
                     <p className="text-gray-500 text-sm mt-1">
                         Archivos generados disponibles para descarga
+                        {dataUpdatedAt && (
+                            <span className="ml-2 text-gray-400">
+                                · Actualizado {formatDistanceToNow(dataUpdatedAt, { addSuffix: true, locale: es })}
+                            </span>
+                        )}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
                     <span className="text-sm text-gray-500">
                         {filteredData.length} archivos
                     </span>
-                    <span className="text-xs text-gray-400">
-                        {lastUpdated.toLocaleTimeString()}
-                    </span>
                     <button
-                        onClick={refreshData}
-                        disabled={isRefreshing}
+                        onClick={() => refetch()}
+                        disabled={isRefetching}
                         className={cn(
                             "flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all",
                             "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50",
-                            isRefreshing && "opacity-50 cursor-not-allowed"
+                            isRefetching && "opacity-50 cursor-not-allowed"
                         )}
                     >
-                        <RefreshCw size={16} className={cn(isRefreshing && "animate-spin")} />
+                        <RefreshCw size={16} className={cn(isRefetching && "animate-spin")} />
                         Actualizar
                     </button>
                 </div>
