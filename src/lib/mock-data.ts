@@ -224,6 +224,7 @@ export function generateMockBitacora(count: number = 30): BitacoraCorreo[] {
             processingResult: hasProcess ? randomItem(['PROCESADO', 'ERROR']) : randomItem(['PENDIENTE', 'IGNORADO']),
             idProceso: hasProcess ? generateUUID() : null,
             errorDetail: !hasProcess || Math.random() < 0.1 ? 'No se pudo detectar compañía/tipo de seguro' : null,
+            conflictos: null,
             processingTime: randomFloat(1, 15, 1)
         });
     }
