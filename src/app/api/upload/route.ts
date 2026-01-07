@@ -45,9 +45,9 @@ export async function POST(request: NextRequest) {
 
         // Verificar credenciales
         const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-        const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+        const serviceAccountKeyRaw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
 
-        if (!serviceAccountEmail || !serviceAccountKey) {
+        if (!serviceAccountEmail || !serviceAccountKeyRaw) {
             console.error('[Upload API] Credenciales de service account no configuradas');
             return NextResponse.json({
                 success: false,
@@ -55,11 +55,31 @@ export async function POST(request: NextRequest) {
             }, { status: 500 });
         }
 
+        // Parsear credenciales JSON
+        let credentials: { private_key?: string; client_email?: string };
+        try {
+            credentials = JSON.parse(serviceAccountKeyRaw);
+        } catch {
+            console.error('[Upload API] Error parseando GOOGLE_SERVICE_ACCOUNT_KEY como JSON');
+            return NextResponse.json({
+                success: false,
+                error: 'Credenciales de Google Drive mal configuradas (JSON inválido)'
+            }, { status: 500 });
+        }
+
+        if (!credentials.private_key) {
+            console.error('[Upload API] private_key no encontrado en credenciales');
+            return NextResponse.json({
+                success: false,
+                error: 'Credenciales de Google Drive incompletas (falta private_key)'
+            }, { status: 500 });
+        }
+
         // Configurar Google Drive API
         const auth2 = new google.auth.GoogleAuth({
             credentials: {
-                client_email: serviceAccountEmail,
-                private_key: serviceAccountKey.replace(/\\n/g, '\n'),
+                client_email: credentials.client_email || serviceAccountEmail,
+                private_key: credentials.private_key,
             },
             scopes: ['https://www.googleapis.com/auth/drive.file'],
         });
@@ -78,7 +98,7 @@ export async function POST(request: NextRequest) {
 
         console.log(`[Upload API] Subiendo: ${fileName} a carpeta ${FOLDER_UPLOADS}`);
 
-        // Subir a Drive
+        // Subir a Drive (con soporte para Shared Drives)
         const driveResponse = await drive.files.create({
             requestBody: {
                 name: fileName,
@@ -89,6 +109,7 @@ export async function POST(request: NextRequest) {
                 body: stream,
             },
             fields: 'id, name, webViewLink',
+            supportsAllDrives: true, // Necesario para Shared Drives
         });
 
         if (!driveResponse.data.id) {
