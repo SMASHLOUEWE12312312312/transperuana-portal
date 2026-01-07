@@ -318,3 +318,87 @@ export async function pingAPI(): Promise<boolean> {
 export function isUsingMockData(): boolean {
     return FORCE_MOCK_DATA;
 }
+
+// ========================================================
+// CARGA MANUAL
+// ========================================================
+
+export interface CompaniasCargaManualResponse {
+    success: boolean;
+    companias: Record<string, string[]>;
+}
+
+export interface CargaManualResultado {
+    idProceso: string;
+    totalRegistros: number;
+    registrosOK: number;
+    registrosError: number;
+    urlTrama: string | null;
+    urlErrores: string | null;
+    mensaje: string;
+    advertencias: string[];
+}
+
+/**
+ * Obtiene compañías disponibles para carga manual
+ */
+export async function fetchCompaniasCargaManual(): Promise<CompaniasCargaManualResponse> {
+    return callAPI<CompaniasCargaManualResponse>('companiasCargaManual');
+}
+
+/**
+ * Sube archivo a Drive y lo procesa
+ */
+export async function procesarCargaManual(
+    file: File,
+    compania: string,
+    tipoSeguro: string
+): Promise<CargaManualResultado> {
+    // 1. Subir archivo a Drive via API Route
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('compania', compania);
+    formData.append('tipoSeguro', tipoSeguro);
+
+    logger.info('[CargaManual] Subiendo archivo a Drive...');
+    const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || 'Error al subir archivo');
+    }
+
+    const uploadResult = await uploadResponse.json();
+
+    if (!uploadResult.success || !uploadResult.fileId) {
+        throw new Error(uploadResult.error || 'No se obtuvo ID del archivo');
+    }
+
+    logger.info('[CargaManual] Archivo subido: ' + uploadResult.fileId);
+
+    // 2. Procesar archivo via Apps Script
+    logger.info('[CargaManual] Procesando archivo...');
+    const response = await fetch('/api/apps-script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            action: 'procesarCargaManual',
+            compania,
+            tipoSeguro,
+            archivoId: uploadResult.fileId,
+            nombreArchivo: file.name,
+        }),
+    });
+
+    const data = await response.json();
+
+    if (!data.success) {
+        throw new Error(data.error || 'Error al procesar archivo');
+    }
+
+    logger.info('[CargaManual] Proceso completado: ' + data.data?.idProceso);
+    return data.data;
+}

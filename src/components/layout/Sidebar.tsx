@@ -12,6 +12,7 @@ import {
     Mail,
     Download,
     Settings,
+    Upload,
     ChevronLeft,
     ChevronRight
 } from 'lucide-react';
@@ -32,6 +33,7 @@ const navItems: NavItem[] = [
     { href: '/errores', label: 'Errores', icon: <AlertCircle size={20} /> },
     { href: '/bitacora', label: 'Bitácora', icon: <Mail size={20} /> },
     { href: '/descargas', label: 'Descargas', icon: <Download size={20} /> },
+    { href: '/carga-manual', label: 'Carga Manual', icon: <Upload size={20} /> },
     { href: '/configuracion', label: 'Configuración', icon: <Settings size={20} />, adminOnly: true },
 ];
 
