@@ -37,16 +37,6 @@ const navItems: NavItem[] = [
     { href: '/configuracion', label: 'Configuración', icon: <Settings size={20} />, adminOnly: true },
 ];
 
-// Mapa de prefetch: queryKey y fetcher para cada ruta
-const PREFETCH_MAP: Record<string, { queryKey: string[]; fetcher: () => Promise<unknown> }> = {
-    '/': { queryKey: ['dashboard'], fetcher: fetchDashboard },
-    '/procesos': { queryKey: ['procesos', 'ALL'], fetcher: () => fetchProcesos({ limite: 200 }) },
-    '/bitacora': { queryKey: ['bitacora'], fetcher: () => fetchBitacora({ limite: 100 }) },
-    '/errores': { queryKey: ['errores'], fetcher: () => fetchErrores({ limite: 500 }) },
-    '/descargas': { queryKey: ['descargas'], fetcher: fetchDescargas },
-    '/configuracion': { queryKey: ['config'], fetcher: fetchConfig },
-};
-
 export function Sidebar() {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
@@ -55,20 +45,52 @@ export function Sidebar() {
 
     // Verificar rol de admin desde la sesión real
     const isAdmin = (session?.user as { role?: string })?.role === 'ADMIN';
+    const userEmail = session?.user?.email || '';
 
     const visibleItems = navItems.filter(item => !item.adminOnly || isAdmin);
 
-    // Prefetch al hover para navegación instantánea
+    // COMMIT 9: Prefetch dinámico con queryKey correcto según rol
     const handlePrefetch = useCallback((href: string) => {
-        const config = PREFETCH_MAP[href];
-        if (!config) return;
-
-        queryClient.prefetchQuery({
-            queryKey: config.queryKey,
-            queryFn: config.fetcher,
-            staleTime: 30000, // 30 segundos de cache en prefetch
-        });
-    }, [queryClient]);
+        if (href === '/procesos') {
+            // AJUSTE: ADMIN usa 'ALL', EJECUTIVO usa su email
+            const ownerEmail = isAdmin ? 'ALL' : userEmail;
+            queryClient.prefetchQuery({
+                queryKey: ['procesos', ownerEmail],
+                queryFn: () => fetchProcesos({ limite: 200, ownerEmail }),
+                staleTime: 30000,
+            });
+        } else if (href === '/') {
+            queryClient.prefetchQuery({
+                queryKey: ['dashboard'],
+                queryFn: () => fetchDashboard(),
+                staleTime: 30000,
+            });
+        } else if (href === '/bitacora') {
+            queryClient.prefetchQuery({
+                queryKey: ['bitacora'],
+                queryFn: () => fetchBitacora({ limite: 100 }),
+                staleTime: 30000,
+            });
+        } else if (href === '/errores') {
+            queryClient.prefetchQuery({
+                queryKey: ['errores'],
+                queryFn: () => fetchErrores({ limite: 500 }),
+                staleTime: 30000,
+            });
+        } else if (href === '/descargas') {
+            queryClient.prefetchQuery({
+                queryKey: ['descargas'],
+                queryFn: () => fetchDescargas(),
+                staleTime: 30000,
+            });
+        } else if (href === '/configuracion' && isAdmin) {
+            queryClient.prefetchQuery({
+                queryKey: ['config'],
+                queryFn: () => fetchConfig(),
+                staleTime: 30000,
+            });
+        }
+    }, [queryClient, isAdmin, userEmail]);
 
     return (
         <aside

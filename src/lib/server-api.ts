@@ -1,15 +1,47 @@
 /**
  * Server-side API functions
  * Optimizado para ISR (Incremental Static Regeneration)
+ * 
+ * COMMIT 1: SSR ahora usa el proxy interno /api/apps-script
+ * para consistencia con CSR y seguridad centralizada
  */
 
-const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL || '';
+import { headers } from 'next/headers';
 import { logger } from './logger';
+
+// Proxy interno - mismo que usa el cliente
+const API_PROXY_URL = '/api/apps-script';
 
 type ServerFetchOptions = { userScoped?: boolean };
 
 /**
- * Fetch optimizado para ISR
+ * Obtiene la URL base para SSR de forma robusta
+ * Prioridad: NEXTAUTH_URL > headers de runtime > localhost
+ */
+async function getProxyBaseUrl(): Promise<string> {
+    // 1. Preferir NEXTAUTH_URL (producción configurada)
+    if (process.env.NEXTAUTH_URL) {
+        return process.env.NEXTAUTH_URL;
+    }
+
+    // 2. Derivar de headers en runtime (SSR robusto)
+    try {
+        const headersList = await headers();
+        const proto = headersList.get('x-forwarded-proto') || 'https';
+        const host = headersList.get('x-forwarded-host') || headersList.get('host');
+        if (host) {
+            return `${proto}://${host}`;
+        }
+    } catch {
+        // headers() puede fallar fuera de request context (build time)
+    }
+
+    // 3. Fallback para desarrollo local
+    return 'http://localhost:3000';
+}
+
+/**
+ * Fetch optimizado para ISR - ahora usa proxy interno
  * - Sin cache en memoria (Next.js maneja el cache)
  * - Con timeout para evitar builds lentos
  * - userScoped=true usa no-store (sin cache) para datos por usuario
@@ -19,19 +51,16 @@ async function serverFetch<T>(
     params: Record<string, string> = {},
     options: ServerFetchOptions = {}
 ): Promise<T | null> {
-    if (!APPS_SCRIPT_URL) {
-        console.error('[Server API] APPS_SCRIPT_URL no configurada');
-        return null;
-    }
-
-    const url = new URL(APPS_SCRIPT_URL);
+    // Construir URL usando el proxy interno
+    const baseUrl = await getProxyBaseUrl();
+    const url = new URL(`${baseUrl}${API_PROXY_URL}`);
     url.searchParams.append('action', action);
     Object.entries(params).forEach(([key, value]) => {
         if (value) url.searchParams.append(key, value);
     });
 
     try {
-        logger.info(`[Server API] Fetching: ${action}`);
+        logger.info(`[Server API] Fetching via proxy: ${action}`);
         const startTime = Date.now();
 
         // AbortController para timeout de 15 segundos
