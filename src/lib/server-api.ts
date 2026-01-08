@@ -40,18 +40,24 @@ async function serverFetch<T>(
 
         const userScoped = Boolean(options.userScoped);
 
-        // NUEVO: Endpoints realtime NUNCA cachean para garantizar datos frescos
+        // Determinar estrategia de revalidación
         const REALTIME_ACTIONS = ['dashboard', 'procesos', 'bitacora', 'errores', 'descargas', 'alertas', 'proceso'];
         const isRealtime = REALTIME_ACTIONS.includes(action);
-        const shouldCache = !isRealtime && !userScoped;
+
+        // ISR: 15s para realtime, 60s para config
+        // userScoped siempre usa no-store sin revalidate
+        const revalidateSeconds = isRealtime ? 15 : 60;
 
         const response = await fetch(url.toString(), {
             method: 'GET',
             redirect: 'follow',
             signal: controller.signal,
-            cache: shouldCache ? 'force-cache' : 'no-store',
-            ...(shouldCache ? { next: { revalidate: 300, tags: [action] } } : {})
+            cache: 'no-store',  // Siempre no-store para datos frescos
+            next: userScoped
+                ? undefined
+                : { revalidate: revalidateSeconds, tags: [action, 'api'] }
         });
+
 
         clearTimeout(timeoutId);
 
@@ -62,7 +68,7 @@ async function serverFetch<T>(
         const data = await response.json();
         const duration = Date.now() - startTime;
 
-        logger.info(`[Server API] ${action} completado en ${duration}ms (cache: ${shouldCache ? 'enabled' : 'disabled'})`);
+        logger.info(`[Server API] ${action} completado en ${duration}ms (ISR: ${userScoped ? 'disabled' : revalidateSeconds + 's'})`);
 
         return data as T;
     } catch (error) {

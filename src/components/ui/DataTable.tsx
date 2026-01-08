@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { cn } from '@/lib/utils';
 import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { EmptyState } from './EmptyState';
@@ -28,7 +29,13 @@ interface DataTableProps<T> {
     };
     onRowClick?: (row: T) => void;
     rowKey: keyof T;
+    // NUEVO: Habilitar virtualización para listas grandes
+    enableVirtualization?: boolean;
+    virtualHeight?: number; // Altura del contenedor en px
 }
+
+// Umbral para activar virtualización automática
+const VIRTUALIZATION_THRESHOLD = 100;
 
 export function DataTable<T extends object>({
     data,
@@ -37,15 +44,21 @@ export function DataTable<T extends object>({
     loading = false,
     emptyState,
     onRowClick,
-    rowKey
+    rowKey,
+    enableVirtualization = true,
+    virtualHeight = 600
 }: DataTableProps<T>) {
     const [sortKey, setSortKey] = useState<string | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
     const [currentPage, setCurrentPage] = useState(1);
+    const parentRef = useRef<HTMLDivElement>(null);
+
+    // Determinar si usar virtualización (solo si hay muchas filas)
+    const shouldVirtualize = enableVirtualization && data.length > VIRTUALIZATION_THRESHOLD;
 
     // Reset to page 1 when filtered data shrinks below current page
     const dataLength = data.length;
-    if (currentPage > Math.ceil(dataLength / pageSize) && dataLength > 0) {
+    if (!shouldVirtualize && currentPage > Math.ceil(dataLength / pageSize) && dataLength > 0) {
         setCurrentPage(1);
     }
 
@@ -74,12 +87,19 @@ export function DataTable<T extends object>({
         });
     }, [data, sortKey, sortDirection]);
 
-    // Paginate data
+    // Virtualizer para scroll infinito
+    const virtualizer = useVirtualizer({
+        count: sortedData.length,
+        getScrollElement: () => parentRef.current,
+        estimateSize: () => 52, // Altura estimada de cada fila en px
+        overscan: 10, // Renderizar 10 filas extra arriba/abajo del viewport
+    });
+
+    // Paginate data (solo cuando NO se usa virtualización)
     const totalPages = Math.ceil(sortedData.length / pageSize);
-    const paginatedData = sortedData.slice(
-        (currentPage - 1) * pageSize,
-        currentPage * pageSize
-    );
+    const paginatedData = shouldVirtualize
+        ? sortedData
+        : sortedData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
     const handleSort = (key: string) => {
         if (sortKey === key) {
@@ -141,6 +161,125 @@ export function DataTable<T extends object>({
         );
     }
 
+    // ========================================
+    // RENDERIZADO VIRTUALIZADO (>100 filas)
+    // ========================================
+    if (shouldVirtualize) {
+        return (
+            <div className="space-y-4">
+                <div className="table-container card border rounded-lg overflow-hidden">
+                    {/* Header fijo */}
+                    <div className="bg-gray-50 border-b">
+                        <table className="table w-full">
+                            <thead>
+                                <tr>
+                                    {columns.map((col) => (
+                                        <th
+                                            key={String(col.key)}
+                                            style={{ width: col.width }}
+                                            className={cn(
+                                                col.align === 'center' && 'text-center',
+                                                col.align === 'right' && 'text-right'
+                                            )}
+                                        >
+                                            {col.sortable ? (
+                                                <button
+                                                    onClick={() => handleSort(String(col.key))}
+                                                    className="flex items-center gap-1 hover:text-gray-900 transition-colors"
+                                                    aria-label={`Ordenar por ${col.label}`}
+                                                >
+                                                    {col.label}
+                                                    <span className="flex flex-col">
+                                                        <ChevronUp
+                                                            size={12}
+                                                            className={cn(
+                                                                '-mb-1',
+                                                                sortKey === col.key && sortDirection === 'asc'
+                                                                    ? 'text-[#CD3529]'
+                                                                    : 'text-gray-300'
+                                                            )}
+                                                        />
+                                                        <ChevronDown
+                                                            size={12}
+                                                            className={cn(
+                                                                sortKey === col.key && sortDirection === 'desc'
+                                                                    ? 'text-[#CD3529]'
+                                                                    : 'text-gray-300'
+                                                            )}
+                                                        />
+                                                    </span>
+                                                </button>
+                                            ) : (
+                                                col.label
+                                            )}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                        </table>
+                    </div>
+
+                    {/* Body virtualizado con scroll */}
+                    <div
+                        ref={parentRef}
+                        className="overflow-auto"
+                        style={{ height: `${virtualHeight}px` }}
+                    >
+                        <div
+                            style={{
+                                height: `${virtualizer.getTotalSize()}px`,
+                                width: '100%',
+                                position: 'relative',
+                            }}
+                        >
+                            {virtualizer.getVirtualItems().map((virtualRow) => {
+                                const row = sortedData[virtualRow.index];
+                                return (
+                                    <div
+                                        key={String(row[rowKey])}
+                                        onClick={() => onRowClick?.(row)}
+                                        className={cn(
+                                            "absolute top-0 left-0 w-full flex border-b border-gray-100 hover:bg-gray-50 transition-colors",
+                                            onRowClick && "cursor-pointer"
+                                        )}
+                                        style={{
+                                            height: `${virtualRow.size}px`,
+                                            transform: `translateY(${virtualRow.start}px)`,
+                                        }}
+                                    >
+                                        {columns.map((col) => (
+                                            <div
+                                                key={String(col.key)}
+                                                className={cn(
+                                                    "px-4 py-3 text-sm text-gray-900 flex items-center",
+                                                    col.align === 'center' && 'justify-center',
+                                                    col.align === 'right' && 'justify-end'
+                                                )}
+                                                style={{ width: col.width, flex: col.width ? 'none' : 1 }}
+                                            >
+                                                {col.render
+                                                    ? col.render(getValue(row, String(col.key)), row, virtualRow.index)
+                                                    : String(getValue(row, String(col.key)) ?? '-')}
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Footer con info */}
+                    <div className="bg-gray-50 border-t px-4 py-2 text-sm text-gray-500">
+                        Mostrando {sortedData.length} registros (scroll virtualizado)
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ========================================
+    // RENDERIZADO NORMAL CON PAGINACIÓN (<100 filas)
+    // ========================================
     return (
         <div className="space-y-4">
             {/* Table */}

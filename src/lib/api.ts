@@ -129,6 +129,9 @@ export interface ProcesosResponse {
         duracionSegundos: number;
     }>;
     total: number;
+    // Paginación cursor
+    nextCursor: string | null;
+    hasMore: boolean;
 }
 
 export interface ProcesoDetalleResponse {
@@ -203,10 +206,11 @@ export async function fetchDashboard(): Promise<DashboardResponse> {
 }
 
 /**
- * Obtiene lista de procesos con filtros opcionales
+ * Obtiene lista de procesos con filtros opcionales y paginación cursor
  */
 export async function fetchProcesos(params?: {
     limite?: number;
+    cursor?: string;      // Paginación cursor
     compania?: string;
     tipoSeguro?: string;
     estado?: string;
@@ -215,7 +219,8 @@ export async function fetchProcesos(params?: {
     ownerEmail?: string;
 }): Promise<ProcesosResponse> {
     return callAPI<ProcesosResponse>('procesos', {
-        limite: params?.limite?.toString() || '100',
+        limite: params?.limite?.toString() || '50',
+        cursor: params?.cursor || '',
         compania: params?.compania || '',
         tipoSeguro: params?.tipoSeguro || '',
         estado: params?.estado || '',

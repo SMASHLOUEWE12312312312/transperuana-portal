@@ -75,6 +75,12 @@ export function ProcesosClient({ initialData, userRole, userEmail }: ProcesosCli
     const [filters, setFilters] = useState<Record<string, string>>({});
     const [showOnlyMine, setShowOnlyMine] = useState(false); // Toggle para ADMIN
 
+    // Estados para paginación cursor
+    const [allProcesos, setAllProcesos] = useState<Proceso[]>([]);
+    const [nextCursor, setNextCursor] = useState<string | null>(null);
+    const [hasMore, setHasMore] = useState(false);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+
     const isAdmin = userRole === 'ADMIN';
 
     // Determinar ownerEmail según rol y toggle
@@ -97,16 +103,52 @@ export function ProcesosClient({ initialData, userRole, userEmail }: ProcesosCli
         refetch
     } = useQuery({
         queryKey: ['procesos', ownerEmail], // CRÍTICO: separar cache por ownerEmail
-        queryFn: () => fetchProcesos({ limite: 200, ownerEmail }),
+        queryFn: () => fetchProcesos({ limite: 50, ownerEmail }),
         initialData: initialData ? {
             procesos: initialData.procesos,
             total: initialData.total,
-            success: true
+            success: true,
+            nextCursor: null,
+            hasMore: false
         } : undefined,
         refetchInterval: pollingInterval,
         refetchOnMount: 'always',
         staleTime: 3000,
     });
+
+    // Sincronizar datos cuando llegan del query
+    useEffect(() => {
+        if (procesosRaw?.procesos) {
+            setAllProcesos(procesosRaw.procesos.map(p => transformProceso(p as APIProceso)));
+            setNextCursor(procesosRaw.nextCursor || null);
+            setHasMore(procesosRaw.hasMore || false);
+        }
+    }, [procesosRaw]);
+
+    // Función para cargar más
+    const loadMore = async () => {
+        if (!nextCursor || isLoadingMore) return;
+
+        setIsLoadingMore(true);
+        try {
+            const moreData = await fetchProcesos({
+                limite: 50,
+                cursor: nextCursor,
+                ownerEmail
+            });
+
+            if (moreData.success && moreData.procesos) {
+                const newProcesos = moreData.procesos.map(p => transformProceso(p as APIProceso));
+                setAllProcesos(prev => [...prev, ...newProcesos]);
+                setNextCursor(moreData.nextCursor || null);
+                setHasMore(moreData.hasMore || false);
+            }
+        } catch (error) {
+            logger.error('[ProcesosClient] Error loading more:', error);
+        } finally {
+            setIsLoadingMore(false);
+        }
+    };
 
     // Invalidar queries cuando cambia el toggle de ADMIN
     useEffect(() => {
@@ -115,11 +157,8 @@ export function ProcesosClient({ initialData, userRole, userEmail }: ProcesosCli
         }
     }, [showOnlyMine, isAdmin, queryClient]);
 
-    // Transformar datos
-    const procesos = useMemo(() => {
-        if (!procesosRaw?.procesos) return [];
-        return procesosRaw.procesos.map(p => transformProceso(p as APIProceso));
-    }, [procesosRaw]);
+    // Usar allProcesos en lugar de procesosRaw
+    const procesos = allProcesos;
 
     const totalProcesos = procesosRaw?.total || 0;
 
@@ -403,6 +442,30 @@ export function ProcesosClient({ initialData, userRole, userEmail }: ProcesosCli
                     }
                 }}
             />
+
+            {/* Botón Cargar más */}
+            {hasMore && (
+                <div className="flex justify-center mt-4">
+                    <button
+                        onClick={loadMore}
+                        disabled={isLoadingMore}
+                        className={cn(
+                            "px-6 py-2 rounded-lg font-medium transition-all",
+                            "bg-gray-100 hover:bg-gray-200 text-gray-700",
+                            isLoadingMore && "opacity-50 cursor-not-allowed"
+                        )}
+                    >
+                        {isLoadingMore ? (
+                            <span className="flex items-center gap-2">
+                                <RefreshCw size={16} className="animate-spin" />
+                                Cargando...
+                            </span>
+                        ) : (
+                            `Cargar más (${procesos.length} de ${totalProcesos})`
+                        )}
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

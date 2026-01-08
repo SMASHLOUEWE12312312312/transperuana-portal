@@ -33,8 +33,9 @@ const NOTIFICATION_COLORS = {
     info: 'text-blue-500 bg-blue-50',
 };
 
-// Polling cada 60 segundos
-const POLLING_INTERVAL = 60000;
+// Polling cada 15 segundos para mejor UX
+const POLLING_INTERVAL = 15000;
+
 
 export function Header() {
     const { data: session, status } = useSession();
