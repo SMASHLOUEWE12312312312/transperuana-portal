@@ -44,7 +44,8 @@ export function UsuariosTab() {
         if (!isAdmin) return;
         setIsLoading(true);
         try {
-            const res = await fetch(`/api/apps-script?action=users.list&requesterEmail=${encodeURIComponent(userEmail)}`);
+            // HOTFIX P0: requesterEmail removido - proxy lo fuerza desde session
+            const res = await fetch(`/api/apps-script?action=users.list`);
             const data = await res.json();
             if (data.success) {
                 setUsuarios(data.usuarios || []);
@@ -54,7 +55,7 @@ export function UsuariosTab() {
         } finally {
             setIsLoading(false);
         }
-    }, [isAdmin, userEmail]);
+    }, [isAdmin]);
 
     useEffect(() => {
         if (isAdmin) loadUsuarios();
@@ -76,9 +77,9 @@ export function UsuariosTab() {
         e.preventDefault();
         setIsSubmitting(true);
         try {
+            // HOTFIX P0: requesterEmail removido - proxy lo fuerza desde session
             const params = new URLSearchParams({
                 action: 'users.upsert',
-                requesterEmail: userEmail,
                 email: formData.email,
                 nombre: formData.nombre,
                 rol: formData.rol,
@@ -100,9 +101,9 @@ export function UsuariosTab() {
     };
 
     const handleSetStatus = async (email: string, estado: string) => {
+        // HOTFIX P0: requesterEmail removido - proxy lo fuerza desde session
         const params = new URLSearchParams({
             action: 'users.setStatus',
-            requesterEmail: userEmail,
             email,
             estado
         });

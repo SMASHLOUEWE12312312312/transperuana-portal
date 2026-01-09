@@ -154,7 +154,16 @@ export async function GET(request: NextRequest) {
             // IGNORAR cualquier ownerEmail que venga del cliente
             url.searchParams.set('ownerEmail', userEmail);
         }
+
+        // ⚠️ SECURITY HOTFIX P0: SIEMPRE forzar requesterEmail desde session
+        // CRÍTICO: Prevenir bypass de RBAC vía spoof de requesterEmail
+        // Un EJECUTIVO allowed NO puede hacerse pasar por ADMIN enviando requesterEmail=admin@...
+        // Backend debe recibir el email REAL del usuario autenticado
+        url.searchParams.delete('requesterEmail'); // Eliminar cualquier spoof
+        url.searchParams.set('requesterEmail', userEmail); // Forzar email real
+        // console.log('[SECURITY] requesterEmail forced:', userEmail); // Audit log
         // ================================================================
+
 
 
         console.log(`[API Proxy] ${userEmail} llamando: ${action}`);
@@ -276,6 +285,13 @@ export async function POST(request: NextRequest) {
             // Ejecutivo SIEMPRE su propio email - IGNORAR cliente
             body.ownerEmail = userEmail;
         }
+
+        // ⚠️ SECURITY HOTFIX P0: SIEMPRE forzar requesterEmail desde session
+        // CRÍTICO: Prevenir bypass de RBAC vía spoof de requesterEmail en body POST
+        // Ignorar cualquier requesterEmail que venga en el body del cliente
+        delete body.requesterEmail; // Eliminar spoof
+        body.requesterEmail = userEmail; // Forzar email real
+        // console.log('[SECURITY POST] requesterEmail forced:', userEmail); // Audit log
         // ================================================================
 
         // Agregar token al body
