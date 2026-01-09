@@ -46,23 +46,31 @@ export async function GET(request: NextRequest) {
             url.searchParams.append(key, value);
         });
 
-        // ========== AGREGAR TOKEN Y EMAIL ==========
+        // ========== AGREGAR TOKEN Y EMAIL (SECURITY HARDENED) ==========
         if (APPS_SCRIPT_TOKEN) {
             url.searchParams.append('_token', APPS_SCRIPT_TOKEN);
         }
 
-        // Para filtro por ejecutivo: pasar email (admin ve todo)
+        // ⚠️ SECURITY: SIEMPRE forzar ownerEmail desde session
+        // NO confiar en ownerEmail del cliente (anti-spoofing)
+        // Admin puede filtrar por compañía/estado, pero ownerEmail es SIEMPRE de session
         if (userRole === 'ADMIN') {
-            // Admin puede pasar ownerEmail=ALL o específico si hay filtro
-            const ownerFilter = searchParams.get('ownerEmail');
-            if (!ownerFilter) {
-                url.searchParams.append('ownerEmail', 'ALL');
+            // Admin puede pasar ownerEmail=ALL para ver todo (común)
+            // O puede NO pasar ownerEmail y ver todo también
+            const clientOwnerFilter = searchParams.get('ownerEmail');
+            if (clientOwnerFilter && clientOwnerFilter.toUpperCase() === 'ALL') {
+                url.searchParams.set('ownerEmail', 'ALL');
+            } else {
+                // Si admin NO especifica ALL, usar su propio email
+                // (para casos donde admin quiere ver solo sus propios procesos)
+                url.searchParams.set('ownerEmail', userEmail);
             }
         } else {
-            // Ejecutivo solo ve sus datos - forzar su email
+            // Ejecutivo SIEMPRE ve solo sus datos - forzar su email
+            // IGNORAR cualquier ownerEmail que venga del cliente
             url.searchParams.set('ownerEmail', userEmail);
         }
-        // ==========================================
+        // ================================================================
 
 
         console.log(`[API Proxy] ${userEmail} llamando: ${action}`);
@@ -149,6 +157,25 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = await request.json();
+
+        const userEmail = session.user.email.toLowerCase();
+        const userRole = (session.user as { role?: string }).role || 'EJECUTIVO';
+
+        // ========== SECURITY: Forzar ownerEmail desde session ==========
+        // NUNCA confiar en ownerEmail del cliente (anti-spoofing)
+        if (userRole === 'ADMIN') {
+            // Admin puede especificar ownerEmail=ALL en el body si quiere
+            if (body.ownerEmail && body.ownerEmail.toUpperCase() === 'ALL') {
+                body.ownerEmail = 'ALL';
+            } else {
+                // Si no especifica ALL, forzar su propio email
+                body.ownerEmail = userEmail;
+            }
+        } else {
+            // Ejecutivo SIEMPRE su propio email - IGNORAR cliente
+            body.ownerEmail = userEmail;
+        }
+        // ================================================================
 
         // Agregar token al body
         if (APPS_SCRIPT_TOKEN) {
