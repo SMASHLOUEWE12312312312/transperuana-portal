@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
 
         console.log(`[API Proxy] ${action} completado en ${duration}ms`);
 
-        // ========== CACHE DINÁMICO ==========
+        // ========== CACHE DINÁMICO (HOTFIX: usar url.searchParams hardenizado) ==========
         // Endpoints que NO deben cachearse (user-scoped)
         const USER_SCOPED_ACTIONS = [
             'alertas', 'notificaciones', 'procesos',
@@ -102,10 +102,16 @@ export async function GET(request: NextRequest) {
             'bitacora', 'errores'
         ];
 
-        const isUserScoped = USER_SCOPED_ACTIONS.includes(action) ||
-            searchParams.get('ownerEmail') !== null;
+        // Endpoints que NUNCA deben cachearse (admin/monitoring)
+        const NO_CACHE_ACTIONS = ['checkMetrics', 'health'];
 
-        const cacheControl = isUserScoped
+        // HOTFIX: Calcular isUserScoped con url.searchParams (post-hardening)
+        // NO usar searchParams original del request
+        const finalOwnerEmail = url.searchParams.get('ownerEmail');
+        const isUserScoped = USER_SCOPED_ACTIONS.includes(action) || !!finalOwnerEmail;
+        const isNoCache = NO_CACHE_ACTIONS.includes(action);
+
+        const cacheControl = (isUserScoped || isNoCache)
             ? 'private, no-store, must-revalidate'
             : 'private, s-maxage=30, stale-while-revalidate=60';
         // ====================================
