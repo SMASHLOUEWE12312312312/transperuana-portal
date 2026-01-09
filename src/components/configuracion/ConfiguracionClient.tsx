@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { fetchConfig } from '@/lib/api';
 import { ServerConfigResponse } from '@/lib/server-api';
 import { cn } from '@/lib/utils';
@@ -9,7 +11,8 @@ import { logger } from '@/lib/logger';
 import { useSmartPolling, POLLING_INTERVALS } from '@/hooks/useSmartPolling';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Users, FileText, Settings, Shield, Plus, Pencil, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Users, FileText, Settings, Shield, Plus, Pencil, Trash2, RefreshCw, AlertTriangle, UserCog } from 'lucide-react';
+import { UsuariosTab } from './UsuariosTab';
 
 interface ConfigData {
     clientes: string[];
@@ -22,7 +25,23 @@ interface ConfiguracionClientProps {
 }
 
 export function ConfiguracionClient({ initialData }: ConfiguracionClientProps) {
-    const [activeTab, setActiveTab] = useState<'usuarios' | 'plantillas' | 'sistema'>('usuarios');
+    const { data: session } = useSession();
+    const searchParams = useSearchParams();
+    const userRole = (session?.user as { role?: string })?.role || 'EJECUTIVO';
+    const isAdmin = userRole === 'ADMIN';
+
+    // Support URL query params for deep linking (e.g., /configuracion?tab=usuarios)
+    const tabFromUrl = searchParams?.get('tab') as 'clientes' | 'plantillas' | 'sistema' | 'usuarios' | null;
+    const [activeTab, setActiveTab] = useState<'clientes' | 'plantillas' | 'sistema' | 'usuarios'>(
+        tabFromUrl && ['clientes', 'plantillas', 'sistema', 'usuarios'].includes(tabFromUrl) ? tabFromUrl : 'clientes'
+    );
+
+    // Update tab when URL changes
+    useEffect(() => {
+        if (tabFromUrl && ['clientes', 'plantillas', 'sistema', 'usuarios'].includes(tabFromUrl)) {
+            setActiveTab(tabFromUrl);
+        }
+    }, [tabFromUrl]);
 
     // Polling inteligente (60s para config - menos crítico)
     const pollingInterval = useSmartPolling(POLLING_INTERVALS.CONFIG);
@@ -57,9 +76,11 @@ export function ConfiguracionClient({ initialData }: ConfiguracionClientProps) {
     }, [configRaw]);
 
     const tabs = [
-        { id: 'usuarios' as const, label: 'Clientes', icon: <Users size={18} /> },
+        { id: 'clientes' as const, label: 'Clientes', icon: <Users size={18} /> },
         { id: 'plantillas' as const, label: 'Plantillas', icon: <FileText size={18} /> },
-        { id: 'sistema' as const, label: 'Sistema', icon: <Settings size={18} /> }
+        { id: 'sistema' as const, label: 'Sistema', icon: <Settings size={18} /> },
+        // Usuarios tab - admin only
+        ...(isAdmin ? [{ id: 'usuarios' as const, label: 'Usuarios', icon: <UserCog size={18} /> }] : [])
     ];
 
     // Handle error state
@@ -140,7 +161,7 @@ export function ConfiguracionClient({ initialData }: ConfiguracionClientProps) {
             </div>
 
             {/* Content */}
-            {activeTab === 'usuarios' && (
+            {activeTab === 'clientes' && (
                 <div className="card">
                     <div className="card-header flex items-center justify-between">
                         <div>
@@ -284,6 +305,10 @@ export function ConfiguracionClient({ initialData }: ConfiguracionClientProps) {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {activeTab === 'usuarios' && (
+                <UsuariosTab />
             )}
         </div>
     );
