@@ -1,7 +1,7 @@
 /**
  * API Route Proxy para Google Apps Script
  * Elimina problemas CORS al actuar como intermediario server-side
- * PROTEGIDO: Requiere sesión autenticada
+ * PROTEGIDO: Requiere sesión autenticada + ALLOWLIST
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
@@ -9,6 +9,79 @@ import { auth } from '@/auth';
 // URL del Apps Script (variable de entorno del servidor, NO pública)
 const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL || '';
 const APPS_SCRIPT_TOKEN = process.env.APPS_SCRIPT_TOKEN || '';
+
+// ==========================================
+// ALLOWLIST CACHE (COMMIT 2)
+// ==========================================
+type AccessCacheEntry = {
+    allowed: boolean;
+    rol?: string;
+    estado?: string;
+    reason?: string;
+    exp: number;
+};
+
+// In-memory cache (puede reiniciarse en serverless - OK)
+const accessCache = new Map<string, AccessCacheEntry>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+/**
+ * Valida acceso del usuario llamando a Apps Script validateAccess
+ * Con cache de 5 minutos para reducir calls
+ */
+async function validateAccess(email: string): Promise<AccessCacheEntry> {
+    const now = Date.now();
+
+    // Check cache
+    const cached = accessCache.get(email);
+    if (cached && cached.exp > now) {
+        return cached;
+    }
+
+    // Call Apps Script
+    try {
+        const url = new URL(APPS_SCRIPT_URL);
+        url.searchParams.set('action', 'validateAccess');
+        url.searchParams.set('email', email);
+        if (APPS_SCRIPT_TOKEN) {
+            url.searchParams.set('_token', APPS_SCRIPT_TOKEN);
+        }
+
+        const response = await fetch(url.toString(), {
+            method: 'GET',
+            redirect: 'follow',
+            headers: { 'Accept': 'application/json' }
+        });
+
+        if (!response.ok) {
+            throw new Error(`validateAccess failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        const entry: AccessCacheEntry = {
+            allowed: data.allowed === true,
+            rol: data.rol,
+            estado: data.estado,
+            reason: data.reason,
+            exp: now + CACHE_TTL
+        };
+
+        // Cache result
+        accessCache.set(email, entry);
+
+        return entry;
+
+    } catch (error) {
+        console.error('[ALLOWLIST] Error validating access:', error);
+        // Fail-closed: si hay error, denegar acceso
+        return {
+            allowed: false,
+            reason: 'Error de validación',
+            exp: now + 60000 // Cache error 1 min
+        };
+    }
+}
 
 
 export async function GET(request: NextRequest) {
@@ -25,6 +98,17 @@ export async function GET(request: NextRequest) {
     const userEmail = session.user.email.toLowerCase();
     const userRole = (session.user as { role?: string }).role || 'EJECUTIVO';
     // =================================================
+
+    // ========== ALLOWLIST ENFORCEMENT (COMMIT 2) ==========
+    const access = await validateAccess(userEmail);
+    if (!access.allowed) {
+        console.warn(`[ALLOWLIST] Access denied for ${userEmail}: ${access.reason}`);
+        return NextResponse.json(
+            { success: false, error: 'Acceso denegado', reason: access.reason },
+            { status: 403 }
+        );
+    }
+    // =====================================================
 
     // Verificar que la URL esté configurada
     if (!APPS_SCRIPT_URL) {
@@ -103,7 +187,7 @@ export async function GET(request: NextRequest) {
         ];
 
         // Endpoints que NUNCA deben cachearse (admin/monitoring)
-        const NO_CACHE_ACTIONS = ['checkMetrics', 'health'];
+        const NO_CACHE_ACTIONS = ['checkMetrics', 'health', 'validateAccess'];
 
         // HOTFIX: Calcular isUserScoped con url.searchParams (post-hardening)
         // NO usar searchParams original del request
@@ -154,6 +238,20 @@ export async function POST(request: NextRequest) {
     }
     // =================================================
 
+    const userEmail = session.user.email.toLowerCase();
+    const userRole = (session.user as { role?: string }).role || 'EJECUTIVO';
+
+    // ========== ALLOWLIST ENFORCEMENT (COMMIT 2) ==========
+    const access = await validateAccess(userEmail);
+    if (!access.allowed) {
+        console.warn(`[ALLOWLIST] Access denied for ${userEmail}: ${access.reason}`);
+        return NextResponse.json(
+            { success: false, error: 'Acceso denegado', reason: access.reason },
+            { status: 403 }
+        );
+    }
+    // =====================================================
+
     if (!APPS_SCRIPT_URL) {
         return NextResponse.json(
             { success: false, error: 'API no configurada' },
@@ -163,9 +261,6 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = await request.json();
-
-        const userEmail = session.user.email.toLowerCase();
-        const userRole = (session.user as { role?: string }).role || 'EJECUTIVO';
 
         // ========== SECURITY: Forzar ownerEmail desde session ==========
         // NUNCA confiar en ownerEmail del cliente (anti-spoofing)
