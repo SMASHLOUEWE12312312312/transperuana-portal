@@ -13,6 +13,7 @@ export interface Column<T> {
     sortable?: boolean;
     align?: 'left' | 'center' | 'right';
     width?: string;
+    className?: string; // Support for custom column classes
     render?: (value: unknown, row: T, index: number) => React.ReactNode;
 }
 
@@ -21,6 +22,7 @@ interface DataTableProps<T> {
     columns: Column<T>[];
     pageSize?: number;
     loading?: boolean;
+    className?: string; // Support for custom table classes
     emptyState?: {
         icon?: React.ReactNode;
         title: string;
@@ -42,6 +44,7 @@ export function DataTable<T extends object>({
     columns,
     pageSize = 10,
     loading = false,
+    className,
     emptyState,
     onRowClick,
     rowKey,
@@ -122,12 +125,12 @@ export function DataTable<T extends object>({
     // Loading skeleton
     if (loading) {
         return (
-            <div className="table-container">
+            <div className={cn("table-container", className)}>
                 <table className="table">
                     <thead>
                         <tr>
                             {columns.map((col) => (
-                                <th key={String(col.key)} style={{ width: col.width }}>
+                                <th key={String(col.key)} style={{ width: col.width }} className={col.className}>
                                     <div className="h-4 w-20 skeleton" />
                                 </th>
                             ))}
@@ -137,7 +140,7 @@ export function DataTable<T extends object>({
                         {Array.from({ length: 5 }).map((_, i) => (
                             <tr key={i}>
                                 {columns.map((col) => (
-                                    <td key={String(col.key)}>
+                                    <td key={String(col.key)} className={col.className}>
                                         <div className="h-4 w-full skeleton" />
                                     </td>
                                 ))}
@@ -167,7 +170,7 @@ export function DataTable<T extends object>({
     if (shouldVirtualize) {
         return (
             <div className="space-y-4">
-                <div className="table-container card border rounded-lg overflow-hidden">
+                <div className={cn("table-container card border rounded-lg overflow-hidden", className)}>
                     {/* Header fijo */}
                     <div className="bg-gray-50 border-b">
                         <table className="table w-full">
@@ -179,7 +182,8 @@ export function DataTable<T extends object>({
                                             style={{ width: col.width }}
                                             className={cn(
                                                 col.align === 'center' && 'text-center',
-                                                col.align === 'right' && 'text-right'
+                                                col.align === 'right' && 'text-right',
+                                                col.className
                                             )}
                                         >
                                             {col.sortable ? (
@@ -236,7 +240,7 @@ export function DataTable<T extends object>({
                                 const row = sortedData[virtualRow.index];
                                 return (
                                     <div
-                                        key={String(row[rowKey])}
+                                        key={`${String(row[rowKey])}-${virtualRow.index}`}
                                         onClick={() => onRowClick?.(row)}
                                         className={cn(
                                             "absolute top-0 left-0 w-full flex border-b border-gray-100 hover:bg-gray-50 transition-colors",
@@ -253,7 +257,8 @@ export function DataTable<T extends object>({
                                                 className={cn(
                                                     "px-4 py-3 text-sm text-gray-900 flex items-center",
                                                     col.align === 'center' && 'justify-center',
-                                                    col.align === 'right' && 'justify-end'
+                                                    col.align === 'right' && 'justify-end',
+                                                    col.className
                                                 )}
                                                 style={{ width: col.width, flex: col.width ? 'none' : 1 }}
                                             >
@@ -283,7 +288,7 @@ export function DataTable<T extends object>({
     return (
         <div className="space-y-4">
             {/* Table */}
-            <div className="table-container card">
+            <div className={cn("table-container card", className)}>
                 <table className="table">
                     <thead>
                         <tr>
@@ -293,7 +298,8 @@ export function DataTable<T extends object>({
                                     style={{ width: col.width }}
                                     className={cn(
                                         col.align === 'center' && 'text-center',
-                                        col.align === 'right' && 'text-right'
+                                        col.align === 'right' && 'text-right',
+                                        col.className
                                     )}
                                 >
                                     {col.sortable ? (
@@ -333,7 +339,7 @@ export function DataTable<T extends object>({
                     <tbody>
                         {paginatedData.map((row, rowIndex) => (
                             <tr
-                                key={String(row[rowKey])}
+                                key={`${String(row[rowKey])}-${rowIndex}`}
                                 onClick={() => onRowClick?.(row)}
                                 className={cn(onRowClick && 'cursor-pointer')}
                                 tabIndex={onRowClick ? 0 : undefined}
@@ -344,7 +350,8 @@ export function DataTable<T extends object>({
                                         key={String(col.key)}
                                         className={cn(
                                             col.align === 'center' && 'text-center',
-                                            col.align === 'right' && 'text-right'
+                                            col.align === 'right' && 'text-right',
+                                            col.className
                                         )}
                                     >
                                         {col.render

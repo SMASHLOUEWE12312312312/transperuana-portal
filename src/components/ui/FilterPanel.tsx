@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { Search, X, Filter, Calendar } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Compania, TipoSeguro, EstadoProceso, TipoError } from '@/lib/types';
+
 
 interface FilterOption {
     value: string;
@@ -106,15 +105,15 @@ export function FilterPanel({
             {/* Search Bar */}
             {filters.search && (
                 <div className="card-body border-b border-gray-200">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <div className="search-input-container">
+                        <Search className="search-icon" size={18} />
                         <input
                             type="text"
                             placeholder="Buscar por ID de proceso, archivo o cliente..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleApply()}
-                            className="input pl-10"
+                            className="input search-input"
                             aria-label="Buscar"
                         />
                         {search && (

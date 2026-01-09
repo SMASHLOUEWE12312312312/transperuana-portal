@@ -7,9 +7,8 @@ import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { fetchErrores } from '@/lib/api';
 import { ServerErroresResponse } from '@/lib/server-api';
-import { logger } from '@/lib/logger';
 import { ErrorDetalle, TipoError } from '@/lib/types';
-import { formatDateTime, truncate, cn } from '@/lib/utils';
+import { formatDateTime, cn } from '@/lib/utils';
 import { useSmartPolling, POLLING_INTERVALS } from '@/hooks/useSmartPolling';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -124,71 +123,89 @@ export function ErroresClient({ initialData }: ErroresClientProps) {
     const columns: Column<ErrorDetalle>[] = [
         {
             key: 'idProceso',
-            label: 'Proceso',
-            width: '120px',
+            label: 'PROCESO',
+            width: '100px',
+            sortable: true,
             render: (value) => (
                 <Link
                     href={`/procesos/${value}`}
-                    className="font-mono text-xs text-[#CD3529] hover:underline flex items-center gap-1"
-                    title={String(value)}
+                    className="text-[#CD3529] hover:underline font-mono text-xs"
+                    onClick={(e) => e.stopPropagation()}
                 >
-                    {String(value).slice(0, 8)}...
-                    <ExternalLink size={12} />
+                    {String(value).substring(0, 12)}... <ExternalLink size={12} className="inline" />
                 </Link>
-            )
+            ),
         },
         {
             key: 'fechaHora',
             label: 'Fecha',
+            width: '130px',
             sortable: true,
-            width: '140px',
             render: (value) => (
-                <span className="text-sm text-gray-500">{formatDateTime(value as Date)}</span>
-            )
+                <span className="text-xs text-gray-600">
+                    {formatDateTime(new Date(String(value)))}
+                </span>
+            ),
         },
         {
             key: 'filaOriginal',
-            label: 'Fila',
+            label: 'FILA',
+            width: '50px',
             align: 'center',
-            width: '60px',
             render: (value) => (
-                <span className="font-mono text-sm">{String(value)}</span>
-            )
+                <span className="text-xs font-mono">{String(value)}</span>
+            ),
         },
         {
             key: 'campo',
             label: 'Campo',
+            width: '120px',
             sortable: true,
-            width: '150px',
             render: (value) => (
-                <span className="font-medium text-gray-900">{String(value)}</span>
-            )
+                <span className="cell-truncate text-xs font-medium" title={String(value)}>
+                    {String(value)}
+                </span>
+            ),
         },
         {
             key: 'valorOriginal',
-            label: 'Valor Original',
+            label: 'VALOR ORIGINAL',
+            width: '140px',
             render: (value) => (
-                <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700" title={String(value)}>
-                    {truncate(String(value) || '(vacío)', 30)}
-                </code>
-            )
+                <span className="cell-truncate text-xs text-gray-500 font-mono" title={String(value || '(vacío)')}>
+                    {value ? String(value) : <span className="italic text-gray-400">(vacío)</span>}
+                </span>
+            ),
         },
         {
             key: 'tipoError',
             label: 'Tipo',
+            width: '150px',
             sortable: true,
-            width: '120px',
-            render: (value) => <StatusBadge status={String(value)} type="error" size="sm" />
+            render: (value) => (
+                <span className={cn(
+                    "badge-error-type",
+                    value === 'OBLIGATORIO_VACIO' && 'badge-obligatorio-vacio',
+                    value === 'FORMATO' && 'badge-formato',
+                    value === 'OBLIGATORIO' && 'badge-obligatorio',
+                    value === 'LONGITUD' && 'badge-longitud',
+                    value === 'VALIDACION' && 'badge-validacion',
+                    value === 'DUPLICADO' && 'badge-duplicado'
+                )} title={String(value)}>
+                    {String(value)}
+                </span>
+            ),
         },
         {
             key: 'descripcionError',
-            label: 'Descripción',
+            label: 'DESCRIPCIÓN',
+            width: 'auto',
             render: (value) => (
-                <span className="text-sm text-gray-600" title={String(value)}>
-                    {truncate(String(value), 50)}
+                <span className="cell-truncate text-xs text-gray-600" title={String(value)}>
+                    {String(value)}
                 </span>
-            )
-        }
+            ),
+        },
     ];
 
     return (
@@ -247,14 +264,14 @@ export function ErroresClient({ initialData }: ErroresClientProps) {
 
             {/* Search and Filters */}
             <div className="flex flex-wrap gap-4">
-                <div className="relative flex-1 min-w-[250px]">
-                    <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <div className="search-input-container flex-1 min-w-[250px]">
+                    <Search size={18} className="search-icon" />
                     <input
                         type="text"
                         placeholder="Buscar por campo, valor o descripción..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="input pl-10 w-full"
+                        className="input search-input"
                     />
                 </div>
                 <select

@@ -7,7 +7,6 @@ import { fetchBitacora } from '@/lib/api';
 import { ServerBitacoraResponse } from '@/lib/server-api';
 import { BitacoraCorreo, Compania, TipoSeguro } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { logger } from '@/lib/logger';
 import { useSmartPolling, POLLING_INTERVALS } from '@/hooks/useSmartPolling';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -254,14 +253,14 @@ export function BitacoraClient({ initialData }: BitacoraClientProps) {
 
             {/* Filters */}
             <div className="flex flex-wrap gap-4">
-                <div className="relative flex-1 min-w-[250px]">
-                    <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <div className="search-input-container flex-1 min-w-[250px]">
+                    <Search size={18} className="search-icon" />
                     <input
                         type="text"
                         placeholder="Buscar por asunto, remitente o adjunto..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="input pl-10 w-full"
+                        className="input search-input"
                     />
                 </div>
                 <select
@@ -285,9 +284,9 @@ export function BitacoraClient({ initialData }: BitacoraClientProps) {
                         <p className="text-gray-500">No se encontraron correos</p>
                     </div>
                 ) : (
-                    filteredData.map((item) => (
+                    filteredData.map((item, index) => (
                         <div
-                            key={item.messageId}
+                            key={`${item.messageId}-${index}`}
                             className="card overflow-hidden"
                         >
                             <button

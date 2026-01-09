@@ -1,6 +1,6 @@
 'use client';
 
-import { cn, formatRelativeTime, getStatusColorClass, formatStatus } from '@/lib/utils';
+import { cn, formatRelativeTime } from '@/lib/utils';
 import { ActivityItem } from '@/lib/types';
 import { FileText, Mail, AlertTriangle, CheckCircle, Clock, XCircle } from 'lucide-react';
 import Link from 'next/link';

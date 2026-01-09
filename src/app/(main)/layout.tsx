@@ -1,5 +1,7 @@
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { SidebarProvider } from "@/contexts/SidebarContext";
+import { MainContent } from "@/components/layout/MainContent";
 
 export default function MainLayout({
     children,
@@ -7,12 +9,10 @@ export default function MainLayout({
     children: React.ReactNode;
 }) {
     return (
-        <>
+        <SidebarProvider>
             <Header />
             <Sidebar />
-            <main className="ml-64 mt-16 min-h-[calc(100vh-4rem)] p-6 transition-all duration-300">
-                {children}
-            </main>
-        </>
+            <MainContent>{children}</MainContent>
+        </SidebarProvider>
     );
 }

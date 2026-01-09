@@ -17,7 +17,7 @@ import {
     ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useSidebar } from '@/contexts/SidebarContext';
 import { fetchDashboard, fetchProcesos, fetchBitacora, fetchErrores, fetchDescargas, fetchConfig } from '@/lib/api';
 
 interface NavItem {
@@ -39,7 +39,7 @@ const navItems: NavItem[] = [
 
 export function Sidebar() {
     const pathname = usePathname();
-    const [collapsed, setCollapsed] = useState(false);
+    const { collapsed, toggle } = useSidebar();
     const { data: session } = useSession();
     const queryClient = useQueryClient();
 
@@ -95,7 +95,8 @@ export function Sidebar() {
     return (
         <aside
             className={cn(
-                "fixed left-0 top-16 h-[calc(100vh-4rem)] bg-white border-r border-gray-200 transition-all duration-300 z-40",
+                "fixed left-0 top-16 h-[calc(100vh-4rem)] bg-white border-r border-gray-200 z-40",
+                "transition-all duration-300 ease-in-out",
                 collapsed ? "w-16" : "w-64"
             )}
         >
@@ -122,7 +123,12 @@ export function Sidebar() {
                                 aria-current={isActive ? 'page' : undefined}
                             >
                                 <span className="flex-shrink-0">{item.icon}</span>
-                                {!collapsed && <span>{item.label}</span>}
+                                <span className={cn(
+                                    "transition-all duration-200",
+                                    collapsed ? "w-0 opacity-0 overflow-hidden" : "w-auto opacity-100"
+                                )}>
+                                    {item.label}
+                                </span>
                             </Link>
                         );
                     })}
@@ -130,12 +136,17 @@ export function Sidebar() {
 
                 {/* Collapse Button */}
                 <button
-                    onClick={() => setCollapsed(!collapsed)}
+                    onClick={toggle}
                     className="nav-item justify-center mt-4 border-t border-gray-200 pt-4"
                     aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
                 >
                     {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
-                    {!collapsed && <span className="flex-1">Colapsar</span>}
+                    <span className={cn(
+                        "flex-1 transition-all duration-200",
+                        collapsed ? "w-0 opacity-0 overflow-hidden" : "w-auto opacity-100"
+                    )}>
+                        Colapsar
+                    </span>
                 </button>
             </nav>
         </aside>

@@ -7,7 +7,6 @@ import { useSession } from 'next-auth/react';
 import { fetchConfig } from '@/lib/api';
 import { ServerConfigResponse } from '@/lib/server-api';
 import { cn } from '@/lib/utils';
-import { logger } from '@/lib/logger';
 import { useSmartPolling, POLLING_INTERVALS } from '@/hooks/useSmartPolling';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -39,7 +38,11 @@ export function ConfiguracionClient({ initialData }: ConfiguracionClientProps) {
     // Update tab when URL changes
     useEffect(() => {
         if (tabFromUrl && ['clientes', 'plantillas', 'sistema', 'usuarios'].includes(tabFromUrl)) {
-            setActiveTab(tabFromUrl);
+            // Use setTimeout to avoid synchronous state update warning
+            const timer = setTimeout(() => {
+                setActiveTab(prev => (prev !== tabFromUrl ? tabFromUrl : prev));
+            }, 0);
+            return () => clearTimeout(timer);
         }
     }, [tabFromUrl]);
 

@@ -33,7 +33,6 @@ export default function RootLayout({
     <html lang="es">
       <body
         className={`${inter.variable} ${plusJakarta.variable} ${jetbrainsMono.variable} antialiased`}
-        style={{ fontFamily: 'var(--font-inter), sans-serif' }}
       >
         <Providers>
           {children}

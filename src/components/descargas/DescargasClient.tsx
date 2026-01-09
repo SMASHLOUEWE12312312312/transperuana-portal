@@ -7,8 +7,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { fetchDescargas } from '@/lib/api';
 import { ServerDescargasResponse } from '@/lib/server-api';
 import { DescargaItem, Compania, TipoSeguro } from '@/lib/types';
-import { logger } from '@/lib/logger';
-import { formatDateTime, formatFileSize, cn } from '@/lib/utils';
+import { formatDateTime, formatFileSize, cn, getCompanyColorClass } from '@/lib/utils';
 import { useSmartPolling, POLLING_INTERVALS } from '@/hooks/useSmartPolling';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -119,11 +118,24 @@ export function DescargasClient({ initialData }: DescargasClientProps) {
         );
     }
 
+    const getCompanyShortName = (compania: string) => {
+        const map: Record<string, string> = {
+            'RIMAC': 'RIMAC',
+            'PACIFICO': 'PACÍFICO',
+            'MAPFRE': 'MAPFRE',
+            'LA_POSITIVA': 'POSITIVA',
+            'SANITAS': 'SANITAS',
+            'CRECER': 'CRECER',
+        };
+        return map[compania] || compania;
+    };
+
     const columns: Column<DescargaItem>[] = [
         {
             key: 'tipo',
             label: 'Tipo',
             width: '60px',
+            className: 'col-tipo',
             render: (value) => (
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${value === 'trama' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'
                     }`}>
@@ -135,29 +147,42 @@ export function DescargasClient({ initialData }: DescargasClientProps) {
             key: 'nombreArchivo',
             label: 'Archivo',
             sortable: true,
+            className: 'col-archivo',
             render: (value) => (
-                <span className="font-medium text-gray-900">{String(value)}</span>
+                <span className="filename-cell" title={String(value)}>
+                    {String(value)}
+                </span>
             )
         },
         {
             key: 'compania',
             label: 'Compañía',
             sortable: true,
-            width: '120px',
-            render: (value) => <StatusBadge status={String(value)} type="company" size="sm" />
+            width: '100px',
+            className: 'col-compania',
+            render: (value) => (
+                <span className={cn(
+                    "badge-company-compact",
+                    getCompanyColorClass(String(value))
+                )}>
+                    {getCompanyShortName(String(value))}
+                </span>
+            )
         },
         {
             key: 'tipoSeguro',
             label: 'Tipo',
             sortable: true,
             width: '100px',
+            className: 'col-seguro',
             render: (value) => <StatusBadge status={String(value)} type="seguro" size="sm" />
         },
         {
             key: 'fechaGeneracion',
             label: 'Fecha',
             sortable: true,
-            width: '150px',
+            width: '140px',
+            className: 'col-fecha',
             render: (value) => (
                 <span className="text-sm text-gray-500">{formatDateTime(value as Date)}</span>
             )
@@ -166,7 +191,8 @@ export function DescargasClient({ initialData }: DescargasClientProps) {
             key: 'tamanio',
             label: 'Tamaño',
             align: 'right',
-            width: '100px',
+            width: '90px',
+            className: 'col-tamanio',
             render: (value) => (
                 <span className="text-sm text-gray-500">
                     {value ? formatFileSize(Number(value)) : '—'}
@@ -176,13 +202,14 @@ export function DescargasClient({ initialData }: DescargasClientProps) {
         {
             key: 'url',
             label: '',
-            width: '80px',
+            width: '110px',
+            className: 'col-accion',
             render: (value) => (
                 <a
                     href={String(value)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="btn btn-primary btn-sm flex items-center gap-1"
+                    className="btn btn-primary btn-sm flex items-center gap-1 justify-center"
                     onClick={(e) => e.stopPropagation()}
                 >
                     <Download size={14} />
@@ -255,14 +282,14 @@ export function DescargasClient({ initialData }: DescargasClientProps) {
 
             {/* Filters */}
             <div className="flex flex-wrap gap-4">
-                <div className="relative flex-1 min-w-[250px]">
-                    <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <div className="search-input-container flex-1 min-w-[250px]">
+                    <Search size={18} className="search-icon" />
                     <input
                         type="text"
                         placeholder="Buscar por nombre de archivo..."
                         value={filters.search || ''}
                         onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                        className="input pl-10 w-full"
+                        className="input search-input"
                     />
                 </div>
                 <select
@@ -294,6 +321,7 @@ export function DescargasClient({ initialData }: DescargasClientProps) {
                 columns={columns}
                 rowKey="id"
                 pageSize={15}
+                className="downloads-table table-fixed-layout"
                 emptyState={{
                     icon: <Download size={48} />,
                     title: 'No hay archivos disponibles',

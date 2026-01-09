@@ -94,12 +94,24 @@ async function serverFetch<T>(
             throw new Error(`Status: ${response.status}`);
         }
 
-        const data = await response.json();
-        const duration = Date.now() - startTime;
+        const text = await response.text();
+        let data: T;
+        if (text.trim().startsWith('<')) {
+            console.warn(`[Server API] Received HTML instead of JSON from ${action}:`, text.substring(0, 200));
+            return null;
+        }
 
+        try {
+            data = JSON.parse(text);
+        } catch (jsonError) {
+            console.error(`[Server API] Invalid JSON response from ${action}:`, jsonError, text.substring(0, 200));
+            return null;
+        }
+
+        const duration = Date.now() - startTime;
         logger.info(`[Server API] ${action} completado en ${duration}ms (ISR: ${userScoped ? 'disabled' : revalidateSeconds + 's'})`);
 
-        return data as T;
+        return data;
     } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
             console.error(`[Server API] Timeout en ${action}`);

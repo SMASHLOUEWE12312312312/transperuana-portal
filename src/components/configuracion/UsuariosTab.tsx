@@ -157,14 +157,14 @@ export function UsuariosTab() {
             </div>
 
             {/* Search */}
-            <div className="relative max-w-md">
-                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <div className="search-input-container max-w-md">
+                <Search size={18} className="search-icon" />
                 <input
                     type="text"
                     placeholder="Buscar por email o nombre..."
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    className="input pl-10 w-full"
+                    className="input search-input"
                 />
             </div>
 

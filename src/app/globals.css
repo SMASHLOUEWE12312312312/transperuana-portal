@@ -10,7 +10,7 @@
   --primary-red: #CD3529;
   --primary-red-dark: #A62B22;
   --primary-red-light: #E85A4F;
-  
+
   /* Neutral Colors */
   --gray-900: #1A1A1A;
   --gray-800: #2D2D2D;
@@ -22,7 +22,7 @@
   --gray-200: #E5E5E5;
   --gray-100: #F5F5F5;
   --white: #FFFFFF;
-  
+
   /* State Colors */
   --success: #22C55E;
   --success-light: #DCFCE7;
@@ -32,25 +32,25 @@
   --error-light: #FEE2E2;
   --info: #3B82F6;
   --info-light: #DBEAFE;
-  
+
   /* Company Colors */
   --rimac-color: #1E3A8A;
   --pacifico-color: #0891B2;
   --mapfre-color: #DC2626;
   --positiva-color: #059669;
   --sanitas-color: #7C3AED;
-  
+
   /* Backgrounds */
   --background: #F8F9FA;
   --foreground: var(--gray-900);
   --card-background: var(--white);
   --sidebar-background: var(--white);
-  
+
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-  
+
   /* Spacing */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -62,14 +62,14 @@
   --space-10: 2.5rem;
   --space-12: 3rem;
   --space-16: 4rem;
-  
+
   /* Border Radius */
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
   --radius-full: 9999px;
-  
+
   /* Transitions */
   --transition-fast: 150ms ease;
   --transition-base: 200ms ease;
@@ -117,7 +117,12 @@ body {
 }
 
 /* Typography */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-display);
   font-weight: 600;
   line-height: 1.25;
@@ -144,40 +149,90 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Animations */
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideInRight {
-  from { opacity: 0; transform: translateX(10px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
-.animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-.animate-slideIn { animation: slideIn 0.3s ease-out; }
-.animate-slideInRight { animation: slideInRight 0.3s ease-out; }
-.animate-spin { animation: spin 1s linear infinite; }
-.animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-slideIn {
+  animation: slideIn 0.3s ease-out;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
 
 /* Skeleton Loader */
 .skeleton {
@@ -219,18 +274,56 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: 0.025em;
 }
 
-.badge-success { background: var(--success-light); color: #166534; }
-.badge-warning { background: var(--warning-light); color: #92400E; }
-.badge-error { background: var(--error-light); color: #991B1B; }
-.badge-info { background: var(--info-light); color: #1E40AF; }
-.badge-gray { background: var(--gray-200); color: var(--gray-700); }
+.badge-success {
+  background: var(--success-light);
+  color: #166534;
+}
+
+.badge-warning {
+  background: var(--warning-light);
+  color: #92400E;
+}
+
+.badge-error {
+  background: var(--error-light);
+  color: #991B1B;
+}
+
+.badge-info {
+  background: var(--info-light);
+  color: #1E40AF;
+}
+
+.badge-gray {
+  background: var(--gray-200);
+  color: var(--gray-700);
+}
 
 /* Company Badges */
-.badge-rimac { background: #DBEAFE; color: var(--rimac-color); }
-.badge-pacifico { background: #CFFAFE; color: #0E7490; }
-.badge-mapfre { background: #FEE2E2; color: var(--mapfre-color); }
-.badge-positiva { background: #D1FAE5; color: var(--positiva-color); }
-.badge-sanitas { background: #EDE9FE; color: var(--sanitas-color); }
+.badge-rimac {
+  background: #DBEAFE;
+  color: var(--rimac-color);
+}
+
+.badge-pacifico {
+  background: #CFFAFE;
+  color: #0E7490;
+}
+
+.badge-mapfre {
+  background: #FEE2E2;
+  color: var(--mapfre-color);
+}
+
+.badge-positiva {
+  background: #D1FAE5;
+  color: var(--positiva-color);
+}
+
+.badge-sanitas {
+  background: #EDE9FE;
+  color: var(--sanitas-color);
+}
 
 /* Button Styles */
 .btn {
@@ -242,44 +335,82 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.875rem;
   font-weight: 500;
   border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
-  border: none;
+  border: 1px solid transparent;
   min-height: 44px;
+  position: relative;
+  isolation: isolate;
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--primary-red);
+  outline-offset: 2px;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .btn-primary {
-  background: var(--primary-red);
+  background: linear-gradient(180deg, var(--primary-red) 0%, #B91C1C 100%);
   color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05), 0 4px 6px -1px rgba(220, 38, 38, 0.25);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--primary-red-dark);
+  background: linear-gradient(180deg, #B91C1C 0%, #991B1B 100%);
+  box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.3), 0 2px 4px -1px rgba(220, 38, 38, 0.1);
+  transform: translateY(-1px);
 }
 
 .btn-secondary {
-  background: var(--gray-100);
+  background: white;
   color: var(--gray-700);
   border: 1px solid var(--gray-300);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--gray-200);
+  background: var(--gray-50);
+  border-color: var(--gray-400);
+  color: var(--gray-900);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .btn-ghost {
   background: transparent;
   color: var(--gray-600);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .btn-ghost:hover:not(:disabled) {
   background: var(--gray-100);
   color: var(--gray-900);
+}
+
+.btn-danger {
+  background: linear-gradient(180deg, #EF4444 0%, #DC2626 100%);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05), 0 4px 6px -1px rgba(220, 38, 38, 0.25);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: linear-gradient(180deg, #DC2626 0%, #B91C1C 100%);
+  box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.3);
+  transform: translateY(-1px);
 }
 
 .btn-sm {
@@ -473,9 +604,248 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Responsive Utilities */
 @media (max-width: 768px) {
-  .hide-mobile { display: none !important; }
+  .hide-mobile {
+    display: none !important;
+  }
 }
 
 @media (min-width: 769px) {
-  .hide-desktop { display: none !important; }
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+/* =====================================================
+   FIX: Search Input - Icon Overlap
+   ===================================================== */
+
+/* Clase específica para inputs con icono izquierdo */
+.input-with-icon-left {
+  padding-left: 2.75rem !important;
+  /* 44px - suficiente espacio para icono */
+}
+
+/* Contenedor de búsqueda mejorado */
+.search-input-container {
+  position: relative;
+  width: 100%;
+}
+
+.search-input-container .search-icon {
+  position: absolute;
+  left: 0.875rem;
+  /* 14px */
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gray-400);
+  pointer-events: none;
+  z-index: 1;
+  width: 18px;
+  height: 18px;
+}
+
+.search-input-container .search-input {
+  width: 100%;
+  padding-left: 2.75rem;
+  /* 44px */
+}
+
+.search-input-container .search-input:focus+.search-icon,
+.search-input-container .search-input:not(:placeholder-shown)+.search-icon {
+  color: var(--gray-500);
+}
+
+/* =====================================================
+   FIX: Tables - Column Alignment
+   ===================================================== */
+
+/* Tabla con layout fijo para control de columnas */
+.table-fixed-layout {
+  table-layout: fixed;
+  width: 100%;
+}
+
+/* Anchos específicos para tabla de ERRORES */
+.errors-table .col-proceso {
+  width: 100px;
+}
+
+.errors-table .col-fecha {
+  width: 130px;
+}
+
+.errors-table .col-fila {
+  width: 50px;
+  text-align: center;
+}
+
+.errors-table .col-campo {
+  width: 120px;
+}
+
+.errors-table .col-valor {
+  width: 140px;
+}
+
+.errors-table .col-tipo {
+  width: 150px;
+}
+
+.errors-table .col-descripcion {
+  width: auto;
+  min-width: 180px;
+}
+
+/* Celda con texto truncado y tooltip en hover */
+.cell-truncate {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-truncate:hover {
+  overflow: visible;
+  white-space: normal;
+  word-break: break-word;
+  position: relative;
+  z-index: 10;
+  background: white;
+  box-shadow: var(--shadow-md);
+  padding: 8px;
+  border-radius: var(--radius-md);
+  /* Asegurar que el tooltip no se corte */
+  min-width: max-content;
+  max-width: 300px;
+}
+
+/* Badges de tipo de error - compactos */
+.badge-error-type {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+/* Variantes de badges de error */
+.badge-obligatorio-vacio {
+  background-color: #FEF3C7;
+  color: #92400E;
+}
+
+.badge-formato {
+  background-color: #FEE2E2;
+  color: #991B1B;
+}
+
+.badge-obligatorio {
+  background-color: #DBEAFE;
+  color: #1E40AF;
+}
+
+.badge-longitud {
+  background-color: #E0E7FF;
+  color: #3730A3;
+}
+
+.badge-validacion {
+  background-color: #D1FAE5;
+  color: #065F46;
+}
+
+.badge-duplicado {
+  background-color: #FEF3C7;
+  color: #B45309;
+}
+
+/* =====================================================
+   FIX: Downloads Table - Column Alignment
+   ===================================================== */
+
+/* Anchos específicos para tabla de DESCARGAS */
+.downloads-table .col-tipo {
+  width: 60px;
+  text-align: center;
+}
+
+.downloads-table .col-archivo {
+  width: auto;
+  min-width: 200px;
+}
+
+.downloads-table .col-compania {
+  width: 100px;
+}
+
+/* Reducido para nombres cortos */
+.downloads-table .col-seguro {
+  width: 100px;
+}
+
+.downloads-table .col-fecha {
+  width: 140px;
+}
+
+.downloads-table .col-tamanio {
+  width: 90px;
+  text-align: right;
+}
+
+.downloads-table .col-accion {
+  width: 110px;
+  text-align: right;
+}
+
+/* Celda de nombre de archivo con truncamiento smart */
+.filename-cell {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  /* 13px */
+  color: var(--gray-700);
+  display: flex;
+  align-items: center;
+  max-width: 100%;
+}
+
+/* Badge de compañía compacto */
+.badge-company-compact {
+  font-size: 10px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  display: inline-block;
+}
+
+/* Abreviaciones de compañías específicas */
+.abbr-rimac::after {
+  content: "RIMAC";
+}
+
+.abbr-pacifico::after {
+  content: "PACÍFICO";
+}
+
+.abbr-mapfre::after {
+  content: "MAPFRE";
+}
+
+.abbr-positiva::after {
+  content: "POSITIVA";
+}
+
+.abbr-sanitas::after {
+  content: "SANITAS";
+}
+
+.abbr-crecer::after {
+  content: "CRECER";
 }
