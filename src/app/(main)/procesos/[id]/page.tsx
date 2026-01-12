@@ -19,12 +19,18 @@ import {
 // Server-side fetch for proceso detail
 async function getProcesoDetalle(id: string) {
     const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL;
+    const APPS_SCRIPT_TOKEN = process.env.APPS_SCRIPT_TOKEN;
     if (!APPS_SCRIPT_URL) return null;
 
     try {
         const url = new URL(APPS_SCRIPT_URL);
         url.searchParams.append('action', 'proceso');
         url.searchParams.append('id', id);
+
+        // HOTFIX: Agregar token de seguridad para autenticación con Apps Script
+        if (APPS_SCRIPT_TOKEN) {
+            url.searchParams.append('_token', APPS_SCRIPT_TOKEN);
+        }
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -33,8 +39,8 @@ async function getProcesoDetalle(id: string) {
             method: 'GET',
             redirect: 'follow',
             signal: controller.signal,
-            cache: 'force-cache',
-            next: { revalidate: 60, tags: ['proceso', id] }
+            cache: 'no-store', // No cachear datos de proceso (user-scoped)
+            next: { revalidate: 30, tags: ['proceso', id] }
         });
 
         clearTimeout(timeoutId);
